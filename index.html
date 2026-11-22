@@ -171,7 +171,7 @@
       <div class="flex items-center gap-1.5 min-w-0">
         <div id="gnss-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b101b] border border-slate-700 shrink-0">
           <span id="gnss-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-          <span id="gnss-status" class="text-[11px] font-bold text-slate-300">GPS待機</span>
+          <span id="gnss-status" class="text-[11px] font-bold text-slate-300">GPS測位中</span>
           <span id="gnss-acc" class="text-xs font-black tabular-nums text-white">--m</span>
         </div>
         <button id="btn-header-modified" type="button" class="px-2 py-1 rounded-xl bg-amber-500/20 border border-amber-400/60 text-[11px] font-black text-amber-300 tabular-nums shrink-0 active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
@@ -194,7 +194,7 @@
 
     <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
       <div class="tabular-nums truncate">
-        現在地: <span id="coords-display" class="text-slate-200 font-semibold">未取得（新発田市周辺）</span>
+        現在地: <span id="coords-display" class="text-slate-200 font-semibold">取得確認中（新発田市周辺）</span>
       </div>
       <div class="tabular-nums shrink-0 ml-2">
         方位: <span id="heading-display" class="text-sky-400 font-bold">--°</span>
@@ -695,9 +695,10 @@
       'use strict';
 
       // =====================================================================
-      // 公開スプレッドシートCSV URL設定（必要に応じてここにURLを設定）
+      // 公開スプレッドシートCSV URL設定（起動時自動同期・手動同期・リセットの基準）
       // =====================================================================
-      const DEFAULT_PUBLISHED_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
+      const DEFAULT_PUBLISHED_CSV_URL =
+        'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
 
       // =====================================================================
       // 描画・GPS・同期・ストレージ定数
@@ -1460,7 +1461,7 @@
           const lsUrl = localStorage.getItem(STORAGE_KEYS.URL);
           if (lsUrl && lsUrl.trim()) return lsUrl.trim();
         } catch (e) {}
-        return String(DEFAULT_PUBLISHED_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv').trim();
+        return String(DEFAULT_PUBLISHED_CSV_URL || '').trim();
       }
 
       function cleanupLegacyStorageKeys() {
@@ -1617,7 +1618,7 @@
 
           if (focusFirst || !prevSelected || !merged.some((h) => h.id === prevSelected.id)) {
             state.selectedId = merged[0].id;
-            if (mapRef.map && focusFirst) {
+            if (mapRef.map && focusFirst && state.userPos.lat === null && state.userPos.lon === null) {
               mapRef.map.setView([merged[0].lat, merged[0].lon], 16, { animate: false });
             }
           }
@@ -2343,8 +2344,86 @@
       }
 
       // =====================================================================
-      // 安全な GPS watchPosition（間引き・異常値ガード・自動パン分離）
+      // 起動時現在地取得（getCurrentPosition）＆ 間引き GPS watchPosition
       // =====================================================================
+      function applyAcceptedPosition(pos, { centerMap = false, minPanDist = 8.0 } = {}) {
+        if (state.isDemo || !pos || !pos.coords) return false;
+        const lat = Number(pos.coords.latitude);
+        const lon = Number(pos.coords.longitude);
+        const acc = Number(pos.coords.accuracy ?? 20);
+
+        if (Number.isNaN(lat) || Number.isNaN(lon)) return false;
+        if (Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01) return false;
+        if (acc > GPS_MAX_ACCURACY_M) return false;
+
+        state.lastGpsAcceptedAt = Date.now();
+        state.lastAcceptedLat = lat;
+        state.lastAcceptedLon = lon;
+        state.userPos = { lat, lon, accuracy: acc };
+
+        updateGnssHeader();
+        updateDetailAndHud();
+
+        if (centerMap && !state.relocate.active && mapRef.map) {
+          state.lastPannedLat = lat;
+          state.lastPannedLon = lon;
+          mapRef.map.setView([lat, lon], Math.max(mapRef.map.getZoom(), 16), { animate: false });
+          renderViewportMarkers();
+        } else if (state.autoPanOnTrack && !state.relocate.active && mapRef.map) {
+          const panMoved =
+            state.lastPannedLat !== null && state.lastPannedLon !== null
+              ? calcDistanceMeters(state.lastPannedLat, state.lastPannedLon, lat, lon)
+              : Infinity;
+          if (panMoved >= minPanDist) {
+            state.lastPannedLat = lat;
+            state.lastPannedLon = lon;
+            mapRef.map.panTo([lat, lon], { animate: false });
+          } else {
+            renderViewportMarkers();
+          }
+        } else {
+          renderViewportMarkers();
+        }
+
+        if (state.ar.active) {
+          renderArOverlay();
+        }
+        return true;
+      }
+
+      function requestInitialGeolocation() {
+        if (!('geolocation' in navigator)) {
+          if (dom.coordsDisplay) dom.coordsDisplay.textContent = '非対応端末（新発田市周辺）';
+          if (dom.gnssStatus) dom.gnssStatus.textContent = 'GPS非対応';
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const accepted = applyAcceptedPosition(pos, { centerMap: true });
+            if (accepted) {
+              showToast('現在地を表示しました', 'success');
+            }
+          },
+          (err) => {
+            const statusMap = {
+              1: 'GPS未許可',
+              2: '測位不可',
+              3: '測位タイムアウト'
+            };
+            if (dom.gnssStatus) dom.gnssStatus.textContent = statusMap[err.code] || 'GPS待機';
+            if (dom.coordsDisplay && state.userPos.lat === null) {
+              dom.coordsDisplay.textContent = '未取得（新発田市周辺を表示中）';
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 10000,
+            timeout: 8000
+          }
+        );
+      }
+
       function toggleGpsWatch() {
         if (state.watchId !== null) {
           navigator.geolocation.clearWatch(state.watchId);
@@ -2394,31 +2473,7 @@
               return;
             }
 
-            state.lastGpsAcceptedAt = now;
-            state.lastAcceptedLat = lat;
-            state.lastAcceptedLon = lon;
-            state.userPos = { lat, lon, accuracy: acc };
-
-            updateGnssHeader();
-            updateDetailAndHud();
-
-            if (state.autoPanOnTrack && !state.relocate.active && mapRef.map) {
-              const panMoved =
-                state.lastPannedLat !== null && state.lastPannedLon !== null
-                  ? calcDistanceMeters(state.lastPannedLat, state.lastPannedLon, lat, lon)
-                  : Infinity;
-              if (panMoved >= 8.0) {
-                state.lastPannedLat = lat;
-                state.lastPannedLon = lon;
-                mapRef.map.panTo([lat, lon], { animate: false });
-              }
-            } else {
-              renderViewportMarkers();
-            }
-
-            if (state.ar.active) {
-              renderArOverlay();
-            }
+            applyAcceptedPosition(pos, { centerMap: false, minPanDist: 8.0 });
           },
           (err) => {
             const labels = {
@@ -3108,9 +3163,10 @@
                 animate: true
               });
             } else {
+              requestInitialGeolocation();
               const s = getSelectedHydrant() || SAMPLE_SHIBATA_HYDRANTS[0];
               mapRef.map.setView([s.lat, s.lon], 16, { animate: true });
-              showToast('現在地未取得のため対象位置へ移動しました', 'info');
+              showToast('現在地を取得中です', 'info');
             }
           });
         }
@@ -3397,7 +3453,7 @@
       }
 
       // =====================================================================
-      // 初期化エントリポイント（キャッシュ即時描画＋公開CSVバックグラウンド同期）
+      // 初期化エントリポイント（キャッシュ即時描画＋起動時現在地＋公開CSV同期）
       // =====================================================================
       window.addEventListener('DOMContentLoaded', () => {
         const hadCachedData = loadFromStorage();
@@ -3408,6 +3464,7 @@
         bindEvents();
         updateGnssHeader();
         updateDetailAndHud();
+        requestInitialGeolocation();
 
         if (resolveActiveCsvUrl()) {
           syncFromPublishedCsv({ silent: hadCachedData, focusFirst: !hadCachedData });
