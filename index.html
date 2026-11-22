@@ -7,14 +7,14 @@
   <title>積雪期 水利・消火栓探索＆点検位置修正ツール</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Leaflet.js CSS & JS CDN (通信圏外でもレーダーは動作するようフォールバック対応) -->
+  <!-- Leaflet.js CSS & JS CDN (通信圏外でもレーダー・ARは動作するようフォールバック対応) -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <!-- Google Fonts: Inter & Noto Sans JP -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
-  
+
   <style>
     /* 基本リセットとタッチ操作の最適化 */
     * {
@@ -248,7 +248,7 @@
           <div>
             <div class="text-xs font-black text-amber-300 flex items-center gap-1.5">
               <span class="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping"></span>
-              位置修正モード：<span id="relocate-target-label" class="text-white">No.--</span>
+              位置修正モード：<span id="relocate-target-label" class="text-white">--</span>
             </div>
             <p class="text-[11px] text-amber-100/90 mt-0.5">
               黄色ピンをドラッグ、または地図上の正しい位置をタップしてください
@@ -286,27 +286,23 @@
         </button>
       </div>
 
-      <!-- 地図モード用コントロール（右上：背景レイヤー切替・ラベル表示切替・追従・ヘディングアップ） -->
+      <!-- 地図モード用コントロール（右上：背景レイヤー切替・住所/地番表示切替・追従・ヘディングアップ） -->
       <div id="map-right-controls" class="absolute top-3 right-3 flex flex-col gap-1.5 z-20">
-        <!-- タイル切替（地理院標準 / 地理院航空写真 / OSM） -->
         <button id="btn-map-layer" type="button" class="px-3 py-2 rounded-2xl bg-slate-950/90 border border-slate-600 text-xs font-bold text-white shadow-lg flex items-center justify-between gap-2 active:scale-95">
           <span class="text-sky-400">地図:</span>
           <span id="map-layer-label">地理院標準</span>
         </button>
 
-        <!-- 常時名前・番号ラベル表示ON/OFF -->
         <button id="btn-map-labels" type="button" class="px-3 py-2 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center justify-between gap-2 active:scale-95">
-          <span>番号/名前表示</span>
+          <span>住所・地番表示</span>
           <span id="map-labels-state" class="font-black">ON</span>
         </button>
 
-        <!-- 現在地自動追従トグル -->
         <button id="btn-map-follow" type="button" class="px-3 py-2 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center justify-between gap-2 active:scale-95">
           <span>現在地追従</span>
           <span id="map-follow-state" class="font-black">ON</span>
         </button>
 
-        <!-- ヘディングアップ / ノースアップ切替 -->
         <button id="btn-map-headingup" type="button" class="px-3 py-2 rounded-2xl bg-slate-950/90 border border-slate-600 text-xs font-bold text-slate-300 shadow-lg flex items-center justify-between gap-2 active:scale-95">
           <span id="map-headingup-label">ノースアップ(北上)</span>
         </button>
@@ -343,7 +339,7 @@
     -------------------------------------------------------------------- -->
     <div id="view-ar" class="hidden relative w-full h-full z-10">
       <video id="ar-video" autoplay playsinline muted class="w-full h-full object-cover opacity-80"></video>
-      
+
       <div class="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-4">
         <div class="self-end bg-slate-950/85 border border-slate-700 px-3 py-1.5 rounded-full text-[11px] font-bold text-amber-400">
           簡易ARカメラ（誤差 <span id="ar-err-badge">--m</span>）
@@ -488,7 +484,7 @@
     <div class="bg-[#151c2c] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-700 flex items-center justify-between gap-2">
         <div>
-          <h2 class="text-base sm:text-lg font-black text-white">水利一覧（距離順）</h2>
+          <h2 class="text-base sm:text-lg font-black text-white">水利一覧（距離順・最大100件）</h2>
           <div id="list-filter-summary" class="text-[11px] text-sky-400 font-bold">全件表示中</div>
         </div>
         <div class="flex items-center gap-1.5">
@@ -500,10 +496,10 @@
           </button>
         </div>
       </div>
-      
+
       <!-- 検索フィルター -->
       <div class="p-3 border-b border-slate-800 bg-slate-900/50 space-y-2">
-        <input id="search-hydrant" type="text" placeholder="番号・住所・目印・グリッド・地上/地下で検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-sky-400">
+        <input id="search-hydrant" type="text" placeholder="住所・番号・目印・グリッド・地上/地下で検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-sky-400">
         <!-- 修正済みデータがある場合のクイックコピーバー -->
         <div id="list-modified-bar" class="hidden flex items-center justify-between bg-amber-500/15 border border-amber-400/50 px-3 py-2 rounded-xl">
           <span id="list-modified-count-text" class="text-xs font-bold text-amber-300">修正済: 0件</span>
@@ -540,9 +536,7 @@
       </div>
 
       <div class="p-3.5 space-y-4 overflow-y-auto max-h-[78vh]">
-        <!-- ===============================================================
-             [SUBTAB 1] スプレッドシート連携（URL / 貼り付け / ファイル）
-        ================================================================ -->
+        <!-- [SUBTAB 1] スプレッドシート連携（URL / 貼り付け / ファイル） -->
         <div id="panel-import" class="space-y-4">
           <div class="flex items-center justify-between bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl">
             <span class="text-xs font-bold text-slate-300">取り込み方法</span>
@@ -596,9 +590,7 @@
           </div>
         </div>
 
-        <!-- ===============================================================
-             [SUBTAB 2] 水利単体の新規登録・座標補正フォーム
-        ================================================================ -->
+        <!-- [SUBTAB 2] 水利単体の新規登録・座標補正フォーム -->
         <div id="panel-form" class="hidden">
           <form id="hydrant-form" class="space-y-3">
             <input type="hidden" id="form-id">
@@ -695,11 +687,8 @@
           </form>
         </div>
 
-        <!-- ===============================================================
-             [SUBTAB 3] 修正データのシート返却出力 & 列マッピング設定
-        ================================================================ -->
+        <!-- [SUBTAB 3] 修正データのシート返却出力 & 列マッピング設定 -->
         <div id="panel-backup" class="hidden space-y-4">
-          <!-- スプレッドシート戻し用コピー＆出力 -->
           <div class="bg-amber-500/10 border border-amber-400/50 p-3 rounded-xl space-y-2.5">
             <div class="flex items-center justify-between">
               <span class="text-xs font-black text-amber-300">スプレッドシート反映用エクスポート</span>
@@ -723,7 +712,6 @@
             </div>
           </div>
 
-          <!-- 列マッピング設定（0始まり列番号） -->
           <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl space-y-2.5">
             <div class="flex items-center justify-between">
               <span class="text-xs font-black text-sky-400">スプレッドシート列マッピング（0始まり）</span>
@@ -761,8 +749,10 @@
      */
 
     // =========================================================================
-    // 1. 初期サンプルデータ（聖籠町の地上式・地下式混在サンプル）
+    // 1. 初期サンプルデータ・定数定義
     // =========================================================================
+    const MAX_DISPLAY_ITEMS = 100;
+
     const DEFAULT_HYDRANTS = [
       {
         id: 'hyd-725',
@@ -856,21 +846,20 @@
       }
     ];
 
-    // 消防水利点検データの標準13列マッピング（0始まりインデックス）
     const DEFAULT_COL_MAP = {
-      no: 0,        // 0: 番号
-      address: 1,   // 1: 住所・地番
-      lat: 2,       // 2: 緯度
-      lon: 3,       // 3: 経度
-      city: 4,      // 4: 市町村
-      offset: 5,    // 5: 位置メモ・目印
-      type: 6,      // 6: 種別
-      scale: 7,     // 7: 規模
-      diameter: 8,  // 8: 口径
-      note: 9,      // 9: 備考
-      sign: 10,     // 10: 標識種別
-      grid: 11,     // 11: 地図グリッド
-      svUrl: 12     // 12: GoogleストリートビューURL
+      no: 0,
+      address: 1,
+      lat: 2,
+      lon: 3,
+      city: 4,
+      offset: 5,
+      type: 6,
+      scale: 7,
+      diameter: 8,
+      note: 9,
+      sign: 10,
+      grid: 11,
+      svUrl: 12
     };
 
     const COL_MAP_LABELS = [
@@ -906,12 +895,9 @@
       colMap: { ...DEFAULT_COL_MAP },
       skipHeader: true,
       sheetUrl: '',
-      // フィルタ状態: 'all' | 'underground' | 'aboveground' | 'modified'
       filterType: 'all',
       filterCity: 'all',
-      // 地図上の常時ラベル表示ON/OFF
       showMapLabels: true,
-      // 位置修正モード状態
       relocateMode: {
         active: false,
         targetId: null,
@@ -920,7 +906,6 @@
         draftLat: null,
         draftLon: null
       },
-      // 表示モード: 'map' | 'radar' | 'ar'
       viewMode: 'map',
       userPos: {
         lat: null,
@@ -970,10 +955,8 @@
       wakeLockText: document.getElementById('wakelock-text'),
       btnDemoToggle: document.getElementById('btn-demo-toggle'),
       demoControls: document.getElementById('demo-controls'),
-      // フィルタバー
       typeFilterChips: document.getElementById('type-filter-chips'),
       cityFilterSelect: document.getElementById('city-filter-select'),
-      // モード切替タブ & ビューコンテナ
       tabModeMap: document.getElementById('tab-mode-map'),
       tabModeRadar: document.getElementById('tab-mode-radar'),
       tabModeAr: document.getElementById('tab-mode-ar'),
@@ -981,14 +964,12 @@
       viewRadar: document.getElementById('view-radar'),
       viewAr: document.getElementById('view-ar'),
       hudDistanceCard: document.getElementById('hud-distance-card'),
-      // 位置修正バナー
       relocateBanner: document.getElementById('relocate-banner'),
       relocateTargetLabel: document.getElementById('relocate-target-label'),
       relocateShiftBadge: document.getElementById('relocate-shift-badge'),
       btnRelocateGps: document.getElementById('btn-relocate-gps'),
       btnRelocateConfirm: document.getElementById('btn-relocate-confirm'),
       btnRelocateCancel: document.getElementById('btn-relocate-cancel'),
-      // 地図モード要素
       leafletMapRotator: document.getElementById('leaflet-map-rotator'),
       mapOfflineFallback: document.getElementById('map-offline-fallback'),
       btnFallbackToRadar: document.getElementById('btn-fallback-to-radar'),
@@ -1003,7 +984,6 @@
       mapHeadingUpLabel: document.getElementById('map-headingup-label'),
       btnMapZoomIn: document.getElementById('btn-map-zoom-in'),
       btnMapZoomOut: document.getElementById('btn-map-zoom-out'),
-      // レーダー・AR・共通HUD
       radarCanvas: document.getElementById('radar-canvas'),
       targetDistance: document.getElementById('target-distance'),
       targetBearing: document.getElementById('target-bearing'),
@@ -1013,7 +993,6 @@
       arDirectionRing: document.getElementById('ar-direction-ring'),
       arDistBadge: document.getElementById('ar-dist-badge'),
       arErrBadge: document.getElementById('ar-err-badge'),
-      // 下部情報パネル
       hydrantNoBadge: document.getElementById('hydrant-no-badge'),
       hydrantTypeBadge: document.getElementById('hydrant-type-badge'),
       hydrantSpecBadge: document.getElementById('hydrant-spec-badge'),
@@ -1025,7 +1004,6 @@
       btnStartRelocate: document.getElementById('btn-start-relocate'),
       btnEditCurrent: document.getElementById('btn-edit-current'),
       btnCopyModifiedRow: document.getElementById('btn-copy-modified-row'),
-      // フッターボタン・モーダル
       btnStartSensors: document.getElementById('btn-start-sensors'),
       sensorBtnText: document.getElementById('sensor-btn-text'),
       btnNearest: document.getElementById('btn-nearest'),
@@ -1040,21 +1018,18 @@
       hydrantListContainer: document.getElementById('hydrant-list-container'),
       modalRegister: document.getElementById('modal-register'),
       registerModalTitle: document.getElementById('register-modal-title'),
-      // サブタブ
       subtabImport: document.getElementById('subtab-import'),
       subtabForm: document.getElementById('subtab-form'),
       subtabBackup: document.getElementById('subtab-backup'),
       panelImport: document.getElementById('panel-import'),
       panelForm: document.getElementById('panel-form'),
       panelBackup: document.getElementById('panel-backup'),
-      // シート読込UI
       inputSheetUrl: document.getElementById('input-sheet-url'),
       btnFetchUrl: document.getElementById('btn-fetch-url'),
       textareaPasteCsv: document.getElementById('textarea-paste-csv'),
       btnImportPaste: document.getElementById('btn-import-paste'),
       selectFileEncoding: document.getElementById('select-file-encoding'),
       inputImportFile: document.getElementById('input-import-file'),
-      // 単体フォーム
       hydrantForm: document.getElementById('hydrant-form'),
       formId: document.getElementById('form-id'),
       formNo: document.getElementById('form-no'),
@@ -1072,7 +1047,6 @@
       formSv: document.getElementById('form-sv'),
       btnFillCurrentGps: document.getElementById('btn-fill-current-gps'),
       btnDeleteHydrant: document.getElementById('btn-delete-hydrant'),
-      // 列設定・バックアップ
       backupModifiedCount: document.getElementById('backup-modified-count'),
       btnCopyModifiedTsvModal: document.getElementById('btn-copy-modified-tsv-modal'),
       chkSkipHeader: document.getElementById('chk-skip-header'),
@@ -1128,9 +1102,6 @@
         return '真後ろ';
       },
 
-      /**
-       * GoogleストリートビューURL取得（13列目があれば優先、空欄なら緯度経度から自動生成）
-       */
       getStreetViewUrl(hydrant) {
         if (hydrant && hydrant.svUrl && hydrant.svUrl.trim().startsWith('http')) {
           return hydrant.svUrl.trim();
@@ -1167,9 +1138,6 @@
       document.body.removeChild(ta);
     }
 
-    /**
-     * スプレッドシートの13列構成そのままのTSV行を生成（Googleスプレッドシート貼付用）
-     */
     function formatHydrantsToSheetTsv(list) {
       const sanitizeCell = (v) => String(v ?? '').replace(/[\r\n\t]+/g, ' ').trim();
       return list
@@ -1359,7 +1327,7 @@
     }
 
     // =========================================================================
-    // 7. データ永続化（LocalStorage）＆ フィルタロジック
+    // 7. データ永続化（LocalStorage）＆ フィルタ・100件制限ロジック
     // =========================================================================
     function loadAppState() {
       try {
@@ -1451,6 +1419,35 @@
         }
         return true;
       });
+    }
+
+    /**
+     * フィルタ適用後の水利リストから、画面描画用に最大 MAX_DISPLAY_ITEMS (100) 件を抽出
+     * 現在地取得済みの場合は近い順にソートして上位100件を優先（選択中ターゲットは必ず含める）
+     */
+    function getDisplayLimitedHydrants() {
+      const filtered = getFilteredHydrants();
+      if (filtered.length <= MAX_DISPLAY_ITEMS) {
+        return filtered;
+      }
+
+      const sorted = [...filtered];
+      if (state.userPos.lat !== null && state.userPos.lon !== null) {
+        sorted.sort((a, b) => {
+          const da = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, a.lat, a.lon);
+          const db = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, b.lat, b.lon);
+          return da - db;
+        });
+      }
+
+      const limited = sorted.slice(0, MAX_DISPLAY_ITEMS);
+      if (state.selectedId && !limited.some((h) => h.id === state.selectedId)) {
+        const selectedObj = filtered.find((h) => h.id === state.selectedId);
+        if (selectedObj) {
+          limited[limited.length - 1] = selectedObj;
+        }
+      }
+      return limited;
     }
 
     function getSelectedHydrant() {
@@ -1554,7 +1551,8 @@
 
       dom.modalRegister.classList.add('hidden');
       updateUI();
-      showToast(`${sourceLabel}から ${importedList.length} 件を取り込みました`, 'success');
+      const capMsg = importedList.length > MAX_DISPLAY_ITEMS ? `（画面表示は最大${MAX_DISPLAY_ITEMS}件）` : '';
+      showToast(`${sourceLabel}から ${importedList.length} 件を取り込みました${capMsg}`, 'success');
     }
 
     // =========================================================================
@@ -1586,7 +1584,7 @@
       mapCtx.map.closePopup();
       mapCtx.map.setView([target.lat, target.lon], Math.max(mapCtx.map.getZoom(), 18), { animate: true });
 
-      dom.relocateTargetLabel.textContent = `${target.no ? `No.${target.no} ` : ''}${target.address}`;
+      dom.relocateTargetLabel.textContent = `${target.address}${target.no ? ` (No.${target.no})` : ''}`;
       dom.relocateBanner.classList.remove('hidden');
       dom.hudDistanceCard.classList.add('hidden');
       dom.mapRightControls.classList.add('hidden');
@@ -1706,7 +1704,6 @@
         }
       });
 
-      // 位置修正モード中に地図をタップした位置へピンを移動
       mapCtx.map.on('click', (e) => {
         if (state.relocateMode.active) {
           updateRelocateDraftPosition(e.latlng.lat, e.latlng.lng);
@@ -1726,16 +1723,13 @@
     }
 
     /**
-     * 地上式・地下式の視覚的区別＋常時ラベル（番号・名前・地上/地下）付きアイコン生成
+     * 地上式・地下式の視覚的区別＋常時ラベル（1. 住所・地番 優先 + (地下/地上)）付きアイコン生成
      */
     function buildHydrantDivIcon(h, isSelected) {
       const cat = getHydrantTypeCategory(h.type);
       const isUnderground = cat === 'underground';
       const isAboveground = cat === 'aboveground';
 
-      // 色と形状の設計：
-      // 地下式 = シアン/ブルー系の四角（マンホール蓋イメージ）＋「地下」バッジ
-      // 地上式 = レッド/ローズ系の丸（消火栓ピラーイメージ）＋「地上」バッジ
       const shapeClass = isUnderground ? 'rounded-lg' : 'rounded-full';
       const bgClass = isUnderground
         ? 'bg-cyan-500 text-slate-950'
@@ -1750,12 +1744,12 @@
         : 'border-2 border-white';
 
       const typeShort = isUnderground ? '地下' : isAboveground ? '地上' : (h.type || '水').slice(0, 2);
-      const noText = h.no ? h.no : typeShort;
 
-      // ピン直下の常時表示ラベル（No.番号 + 位置メモまたは住所 + (地下/地上)）
-      const displayName = (h.offset && h.offset !== '位置メモ未登録' ? h.offset : h.address) || '';
-      const shortName = displayName.length > 13 ? displayName.slice(0, 12) + '…' : displayName;
-      const labelTitle = `${h.no ? `No.${h.no} ` : ''}${shortName} (${typeShort})`;
+      // 1列目「住所・地番（address）」を最優先表示
+      const primaryAddr = (h.address || h.offset || (h.no ? `No.${h.no}` : typeShort)).trim();
+      const shortAddr = primaryAddr.length > 14 ? primaryAddr.slice(0, 13) + '…' : primaryAddr;
+      const pinText = shortAddr.length > 6 ? shortAddr.slice(0, 5) + '…' : shortAddr;
+      const labelTitle = `${shortAddr} (${typeShort})`;
 
       const labelHtml = state.showMapLabels
         ? `<div class="mt-1 px-1.5 py-0.5 rounded-md bg-slate-950/90 border ${
@@ -1771,8 +1765,8 @@
 
       const html = `
         <div class="flex flex-col items-center" style="transform: translate(-50%, -18px); width: max-content;">
-          <div class="relative flex items-center justify-center min-w-[34px] h-[34px] px-1.5 ${shapeClass} ${bgClass} ${borderClass} shadow-lg font-black text-xs tabular-nums">
-            ${escapeHtml(noText)}
+          <div class="relative flex items-center justify-center min-w-[36px] h-[34px] px-1.5 ${shapeClass} ${bgClass} ${borderClass} shadow-lg font-black text-[11px]">
+            ${escapeHtml(pinText)}
             ${modifiedDot}
           </div>
           ${labelHtml}
@@ -1787,9 +1781,6 @@
       });
     }
 
-    /**
-     * ピンタップ時のポップアップHTML（番号・地上/地下・ストリートビュー・位置修正ボタン）
-     */
     function buildHydrantPopupHtml(h) {
       const cat = getHydrantTypeCategory(h.type);
       const badgeColor =
@@ -1800,17 +1791,20 @@
           : 'bg-amber-500/25 text-amber-300 border-amber-400';
 
       const svUrl = GeoUtils.getStreetViewUrl(h);
-      const specParts = [h.diameter ? `φ${h.diameter}` : '', h.sign || '', h.grid ? `図:${h.grid}` : ''].filter(Boolean);
+      const specParts = [
+        h.no ? `No.${h.no}` : '',
+        h.diameter ? `φ${h.diameter}` : '',
+        h.sign || '',
+        h.grid ? `図:${h.grid}` : ''
+      ].filter(Boolean);
 
       return `
         <div class="space-y-2">
           <div class="flex items-center gap-1.5 flex-wrap">
-            <span class="px-1.5 py-0.5 rounded bg-sky-500/25 border border-sky-400 text-sky-300 font-black text-[11px] tabular-nums">
-              ${h.no ? `No.${escapeHtml(h.no)}` : 'No.--'}
-            </span>
             <span class="px-1.5 py-0.5 rounded border font-black text-[11px] ${badgeColor}">
               ${escapeHtml(h.type || '水利')}
             </span>
+            ${h.no ? `<span class="px-1.5 py-0.5 rounded bg-sky-500/25 border border-sky-400 text-sky-300 font-black text-[11px] tabular-nums">No.${escapeHtml(h.no)}</span>` : ''}
             ${h.modified ? '<span class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px]">修正済</span>' : ''}
           </div>
           <div>
@@ -1830,7 +1824,6 @@
       `;
     }
 
-    // ポップアップ内ボタンからのグローバル呼び出しブリッジ
     window.__triggerRelocateFromPopup = function (hydrantId) {
       startRelocateMode(hydrantId);
     };
@@ -1838,7 +1831,7 @@
     function syncMapMarkers() {
       if (!mapCtx.isReady || !mapCtx.map) return;
 
-      const visibleHydrants = getFilteredHydrants();
+      const visibleHydrants = getDisplayLimitedHydrants();
       const target = getSelectedHydrant();
 
       const activeIds = new Set(visibleHydrants.map((h) => h.id));
@@ -1850,7 +1843,6 @@
       });
 
       visibleHydrants.forEach((h) => {
-        // 位置修正モード中の対象ピンは専用のドラッグマーカーに任せるため一時非表示
         if (state.relocateMode.active && h.id === state.relocateMode.targetId) {
           if (mapCtx.hydrantMarkers[h.id]) {
             mapCtx.map.removeLayer(mapCtx.hydrantMarkers[h.id]);
@@ -1883,7 +1875,6 @@
         }
       });
 
-      // 位置修正モード専用マーカー＆移動ライン描画
       if (state.relocateMode.active) {
         const rm = state.relocateMode;
         const origLatLng = [rm.origLat, rm.origLon];
@@ -1946,7 +1937,6 @@
         clearRelocateLayers();
       }
 
-      // 現在地マーカー＆GNSS誤差円
       if (state.userPos.lat !== null && state.userPos.lon !== null) {
         const userLatLng = [state.userPos.lat, state.userPos.lon];
         const acc = state.userPos.accuracy || 5;
@@ -2216,14 +2206,13 @@
         state.selectedId = nearest.id;
         updateUI();
         if (!silent) {
-          const prefix = nearest.no ? `No.${nearest.no} ` : '';
-          showToast(`最寄り選択: ${prefix}${nearest.address} (${minDist.toFixed(0)}m)`, 'success');
+          showToast(`最寄り選択: ${nearest.address} (${minDist.toFixed(0)}m)`, 'success');
         }
       }
     }
 
     // =========================================================================
-    // 13. 2Dレーダー描画ロジック（Canvas・地上/地下色分け対応）
+    // 13. 2Dレーダー描画ロジック（Canvas・地上/地下色分け・最大100件対応）
     // =========================================================================
     function drawRadar() {
       const canvas = dom.radarCanvas;
@@ -2318,7 +2307,7 @@
         ctx.setLineDash([]);
       }
 
-      const visibleHydrants = getFilteredHydrants();
+      const visibleHydrants = getDisplayLimitedHydrants();
       const target = getSelectedHydrant();
 
       if (state.userPos.lat !== null && target) {
@@ -2398,7 +2387,6 @@
     function updateUI() {
       syncFilterChipsUI();
 
-      // 修正済み件数の表示更新
       const modifiedList = state.hydrants.filter((h) => h.modified);
       if (modifiedList.length > 0) {
         dom.headerModifiedBadge.textContent = `修正済: ${modifiedList.length}件`;
@@ -2407,7 +2395,6 @@
         dom.headerModifiedBadge.classList.add('hidden');
       }
 
-      // 1. 測位精度ステータス更新
       const acc = state.userPos.accuracy;
       if (acc !== null) {
         dom.accuracyVal.textContent = `±${acc.toFixed(1)}m`;
@@ -2430,7 +2417,6 @@
 
       dom.currentHeading.textContent = `${Math.round(state.heading)}°`;
 
-      // 2. 選択中の水利情報更新
       const target = getSelectedHydrant();
       if (target) {
         dom.hydrantNoBadge.textContent = target.no ? `No.${target.no}` : 'No.--';
@@ -2477,7 +2463,6 @@
             : target.offset;
         dom.hydrantOffset.textContent = memoText;
 
-        // ストリートビューURL（登録済みURL優先、未登録時は緯度経度から自動生成）
         dom.btnOpenSv.href = GeoUtils.getStreetViewUrl(target);
 
         if (state.userPos.lat !== null) {
@@ -2619,7 +2604,6 @@
         modified: '修正済のみ'
       };
       const cityLabel = state.filterCity === 'all' ? '全市町村' : state.filterCity;
-      dom.listFilterSummary.textContent = `表示: ${typeLabelMap[state.filterType]} / ${cityLabel} (${baseList.length}件)`;
 
       const kw = keyword.trim().toLowerCase();
       let list = baseList.map((h) => {
@@ -2645,6 +2629,14 @@
             (h.type || '').toLowerCase().includes(kw)
         );
       }
+
+      const totalMatched = list.length;
+      if (list.length > MAX_DISPLAY_ITEMS) {
+        list = list.slice(0, MAX_DISPLAY_ITEMS);
+      }
+
+      const capNote = totalMatched > MAX_DISPLAY_ITEMS ? ` / 最大${MAX_DISPLAY_ITEMS}件表示` : '';
+      dom.listFilterSummary.textContent = `表示: ${typeLabelMap[state.filterType]} / ${cityLabel} (${list.length}/${totalMatched}件${capNote})`;
 
       if (list.length === 0) {
         container.innerHTML = '<div class="text-center text-slate-400 py-8 text-sm">該当する水利が見つかりません</div>';
@@ -2708,7 +2700,7 @@
             mapCtx.map.setView([h.lat, h.lon], 17);
           }
           updateUI();
-          showToast(`「${h.no ? `No.${h.no} ` : ''}${h.address}」を選択しました`, 'success');
+          showToast(`「${h.address}」を選択しました`, 'success');
         });
 
         container.appendChild(card);
@@ -2793,7 +2785,6 @@
       dom.btnWakeLock.addEventListener('click', toggleWakeLock);
       dom.btnDemoToggle.addEventListener('click', toggleDemoMode);
 
-      // 種別ワンタップフィルタ
       dom.typeFilterChips.querySelectorAll('button[data-type-filter]').forEach((btn) => {
         btn.addEventListener('click', () => {
           state.filterType = btn.dataset.typeFilter;
@@ -2802,20 +2793,17 @@
         });
       });
 
-      // 市町村フィルタ
       dom.cityFilterSelect.addEventListener('change', (e) => {
         state.filterCity = e.target.value;
         saveFilterState();
         updateUI();
       });
 
-      // 3モード切替タブ
       dom.tabModeMap.addEventListener('click', () => switchViewMode('map'));
       dom.tabModeRadar.addEventListener('click', () => switchViewMode('radar'));
       dom.tabModeAr.addEventListener('click', () => switchViewMode('ar'));
       dom.btnFallbackToRadar.addEventListener('click', () => switchViewMode('radar'));
 
-      // 地図上での位置修正モード操作
       dom.btnStartRelocate.addEventListener('click', () => {
         const current = getSelectedHydrant();
         if (current) startRelocateMode(current.id);
@@ -2839,7 +2827,6 @@
         showToast('位置修正をキャンセルしました', 'info');
       });
 
-      // 地図コントロール
       dom.btnMapLayer.addEventListener('click', () => {
         if (!mapCtx.isReady) return;
         state.mapTileIdx = (state.mapTileIdx + 1) % state.mapTileKeys.length;
@@ -2862,7 +2849,7 @@
         } catch (e) {}
         syncLabelsButtonUI();
         syncMapMarkers();
-        showToast(`地図上の番号/名前常時表示を${state.showMapLabels ? 'ON' : 'OFF'}にしました`, 'info');
+        showToast(`地図上の住所・地番常時表示を${state.showMapLabels ? 'ON' : 'OFF'}にしました`, 'info');
       });
 
       dom.btnMapFollow.addEventListener('click', () => {
@@ -2891,7 +2878,6 @@
         if (mapCtx.isReady) mapCtx.map.zoomOut();
       });
 
-      // レーダー縮尺
       dom.btnRadarScale.addEventListener('click', () => {
         state.radarScaleIdx = (state.radarScaleIdx + 1) % state.radarScales.length;
         const scale = state.radarScales[state.radarScaleIdx];
@@ -2899,15 +2885,12 @@
         drawRadar();
       });
 
-      // デモ移動パッド
       dom.demoControls.querySelectorAll('button[data-demo]').forEach((btn) => {
         btn.addEventListener('click', () => handleDemoAction(btn.dataset.demo));
       });
 
-      // 最寄り水利選択
       dom.btnNearest.addEventListener('click', () => selectNearestHydrant(false));
 
-      // 水利一覧モーダル
       dom.btnOpenList.addEventListener('click', () => {
         dom.searchHydrant.value = '';
         renderHydrantList();
@@ -2915,26 +2898,23 @@
       });
       dom.searchHydrant.addEventListener('input', (e) => renderHydrantList(e.target.value));
 
-      // 一覧モーダルから「読込/出力設定」へ
       dom.btnOpenRegisterFromList.addEventListener('click', () => {
         dom.modalList.classList.add('hidden');
         openDataModal('import', null);
       });
 
-      // 数値/メモ編集モーダル
       dom.btnEditCurrent.addEventListener('click', () => {
         const current = getSelectedHydrant();
         if (current) openDataModal('form', current);
       });
 
-      // 修正済み行のワンタップTSVコピー（下部カード / 一覧モーダル / バックアップタブ）
       dom.btnCopyModifiedRow.addEventListener('click', () => {
         const current = getSelectedHydrant();
         if (!current) return;
         const tsv = formatHydrantsToSheetTsv([current]);
         copyTextToClipboard(
           tsv,
-          `No.${current.no || ''} の13列データをコピーしました（スプレッドシートへ貼付可）`
+          `${current.address} の13列データをコピーしました（スプレッドシートへ貼付可）`
         );
       });
 
@@ -2953,12 +2933,10 @@
       dom.btnCopyAllModified.addEventListener('click', copyAllModifiedHandler);
       dom.btnCopyModifiedTsvModal.addEventListener('click', copyAllModifiedHandler);
 
-      // サブタブ切替
       dom.subtabImport.addEventListener('click', () => switchRegisterSubtab('import'));
       dom.subtabForm.addEventListener('click', () => switchRegisterSubtab('form'));
       dom.subtabBackup.addEventListener('click', () => switchRegisterSubtab('backup'));
 
-      // モーダル閉じる
       document.querySelectorAll('[data-close-modal]').forEach((btn) => {
         btn.addEventListener('click', () => {
           const targetId = btn.getAttribute('data-close-modal');
@@ -2966,7 +2944,6 @@
         });
       });
 
-      // ① 公開CSV / GAS URLからfetch読込
       dom.btnFetchUrl.addEventListener('click', async () => {
         const url = dom.inputSheetUrl.value.trim();
         if (!url) {
@@ -3005,7 +2982,6 @@
         }
       });
 
-      // ② CSV / TSV テキスト貼り付け読込
       dom.btnImportPaste.addEventListener('click', () => {
         const raw = dom.textareaPasteCsv.value;
         if (!raw.trim()) {
@@ -3022,7 +2998,6 @@
         }
       });
 
-      // ③ CSV / TSV / JSON ファイル読込
       dom.inputImportFile.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -3067,7 +3042,6 @@
         reader.readAsArrayBuffer(file);
       });
 
-      // 列マッピング保存・初期化
       dom.btnSaveColmap.addEventListener('click', () => {
         const nextMap = { ...state.colMap };
         dom.colmapGrid.querySelectorAll('input[data-col-key]').forEach((inp) => {
@@ -3094,7 +3068,6 @@
         showToast('標準の13列マッピングに戻しました', 'info');
       });
 
-      // 現在地GPSをフォームへ反映
       dom.btnFillCurrentGps.addEventListener('click', () => {
         if (state.userPos.lat === null) {
           showToast('現在地GPSがまだ取得できていません', 'warn');
@@ -3105,7 +3078,6 @@
         showToast('現在地の緯度・経度を反映しました', 'success');
       });
 
-      // 単体フォーム保存処理
       dom.hydrantForm.addEventListener('submit', (e) => {
         e.preventDefault();
         const id = dom.formId.value;
@@ -3155,7 +3127,6 @@
         showToast('水利データを保存しました（修正済として記録）', 'success');
       });
 
-      // 水利削除
       dom.btnDeleteHydrant.addEventListener('click', () => {
         const id = dom.formId.value;
         if (!id) return;
@@ -3172,7 +3143,6 @@
         showToast('水利データを削除しました', 'info');
       });
 
-      // CSVエクスポート（13列フォーマット）
       dom.btnExportCsv.addEventListener('click', () => {
         const headers = [
           '番号',
@@ -3224,7 +3194,6 @@
         showToast('13列フォーマットでCSVファイルを出力しました', 'success');
       });
 
-      // JSONエクスポート
       dom.btnExportJson.addEventListener('click', () => {
         const jsonStr = JSON.stringify(state.hydrants, null, 2);
         const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -3237,7 +3206,6 @@
         showToast('JSONバックアップファイルを出力しました', 'success');
       });
 
-      // 初期サンプルデータリセット
       dom.btnResetSample.addEventListener('click', () => {
         state.hydrants = JSON.parse(JSON.stringify(DEFAULT_HYDRANTS));
         state.selectedId = state.hydrants[0].id;
