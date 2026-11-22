@@ -27,7 +27,7 @@
       overscroll-behavior: none;
     }
 
-    /* iOS自動ズーム防止のため入力欄は16px以上を確保 */
+    /* Prevent iOS Safari input auto-zoom by keeping form controls >= 16px */
     input, select, textarea {
       font-size: 16px !important;
     }
@@ -38,7 +38,7 @@
     }
 
     .glove-btn {
-      min-height: 48px;
+      min-height: 46px;
       border-radius: 14px;
       font-weight: 800;
       display: inline-flex;
@@ -54,10 +54,7 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* =========================================================================
-       重なり順（スタッキングコンテキスト）の明確化
-       Leaflet地図は z-index: 1 に閉じ込め、UIボタンやモーダルが必ず前面に来るようにする
-       ========================================================================= */
+    /* Stacking context isolation: keep Leaflet map strictly below UI overlays, drawers, and modals */
     #map-wrapper {
       position: relative;
       flex: 1 1 0%;
@@ -77,7 +74,6 @@
       touch-action: pan-x pan-y pinch-zoom;
     }
 
-    /* Leaflet内部ペインが外部UIのz-indexを超えないように固定 */
     #leaflet-map .leaflet-pane { z-index: 2; }
     #leaflet-map .leaflet-tile-pane { z-index: 2; }
     #leaflet-map .leaflet-overlay-pane { z-index: 4; }
@@ -88,7 +84,6 @@
     #leaflet-map .leaflet-top,
     #leaflet-map .leaflet-bottom { z-index: 10; }
 
-    /* アプリ本体UI・フローティング操作・モーダル階層 */
     .app-header {
       position: relative;
       z-index: 1200;
@@ -130,7 +125,7 @@
     }
     .leaflet-popup-content {
       margin: 11px 13px !important;
-      min-width: 225px;
+      min-width: 230px;
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
     }
     .leaflet-popup-tip {
@@ -143,7 +138,6 @@
       padding: 6px 8px !important;
     }
 
-    /* 選択中シンボルの脈動ハイライト */
     @keyframes symbolSelectedPulse {
       0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.9); }
       70% { transform: scale(1.16); box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
@@ -168,26 +162,29 @@
 </head>
 <body class="flex flex-col h-dvh overflow-hidden bg-[#0b101b] text-slate-100">
 
-  <!-- 上部ヘッダー（z-index: 1200） -->
+  <!-- Top Header -->
   <header class="app-header ui-lock-zoom bg-[#111827] border-b border-slate-800 px-3 pt-2 pb-2 shrink-0 shadow-lg">
-    <div class="flex items-center justify-between gap-2">
+    <div class="flex items-center justify-between gap-1.5">
       <div class="flex items-center gap-1.5 min-w-0">
         <div id="gnss-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b101b] border border-slate-700 shrink-0">
           <span id="gnss-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
           <span id="gnss-status" class="text-[11px] font-bold text-slate-300">GPS待機</span>
           <span id="gnss-acc" class="text-xs font-black tabular-nums text-white">--m</span>
         </div>
-        <span id="modified-count-badge" class="hidden px-2 py-1 rounded-xl bg-amber-500/20 border border-amber-400/60 text-[11px] font-black text-amber-300 tabular-nums shrink-0">
-          修正: 0件
-        </span>
+        <button id="btn-header-modified" type="button" class="px-2 py-1 rounded-xl bg-amber-500/20 border border-amber-400/60 text-[11px] font-black text-amber-300 tabular-nums shrink-0 active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
+          修正: <span id="modified-count-num">0</span>件
+        </button>
       </div>
 
-      <div class="flex items-center gap-1.5 shrink-0">
-        <button id="btn-autopan-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-300 active:scale-95" title="GPS追従中の自動地図移動">
-          自動移動: <span id="autopan-label" class="text-sky-400 font-black">OFF</span>
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btn-sync-now" type="button" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-[11px] font-black text-emerald-300 active:scale-95" title="公開CSVから最新データを同期">
+          <span id="sync-label">同期</span>
         </button>
-        <button id="btn-demo-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-sky-400 active:scale-95">
-          <span id="demo-label">デモ: OFF</span>
+        <button id="btn-autopan-toggle" type="button" class="px-2 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-300 active:scale-95" title="GPS追従中の自動地図移動">
+          自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
+        </button>
+        <button id="btn-demo-toggle" type="button" class="px-2 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-sky-400 active:scale-95">
+          <span id="demo-label">デモ:OFF</span>
         </button>
       </div>
     </div>
@@ -201,7 +198,7 @@
       </div>
     </div>
 
-    <!-- 種別＆市町村フィルタ + シンボル凡例 -->
+    <!-- Filter Chips & Municipality Selector -->
     <div class="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
       <div id="filter-chips" class="flex items-center gap-1 shrink-0">
         <button type="button" data-filter="all" class="px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-sky-500 text-slate-950">すべて</button>
@@ -219,11 +216,11 @@
     </div>
   </header>
 
-  <!-- 中央地図エリア（#map-wrapper 内 #leaflet-map は z-index: 1） -->
+  <!-- Main Map Canvas Area -->
   <main id="map-wrapper">
     <div id="leaflet-map"></div>
 
-    <!-- 左上HUD：選択ターゲット距離＆方位（pointer-events-none で地図操作を妨げない） -->
+    <!-- Top-Left HUD -->
     <div id="target-hud" class="map-overlay-ui ui-lock-zoom absolute top-3 left-3 bg-[#0b101b]/90 border border-slate-700/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-xl pointer-events-none max-w-[165px]">
       <div class="flex items-center gap-1">
         <span class="text-[10px] font-bold text-slate-400">ターゲット距離</span>
@@ -238,7 +235,7 @@
       </div>
     </div>
 
-    <!-- 位置修正モードバナー（z-index: 1150） -->
+    <!-- Relocation Mode Banner -->
     <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 bg-amber-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md pointer-events-auto">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
@@ -266,7 +263,7 @@
       </div>
     </div>
 
-    <!-- 右上コントロール：表示件数バッジ・地図レイヤー切替・現在地移動（z-index: 1050） -->
+    <!-- Top-Right Map Controls & Count Badge -->
     <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-3 right-3 flex flex-col items-end gap-1.5 pointer-events-none">
       <div id="viewport-badge" class="px-2.5 py-1.5 rounded-2xl bg-[#0b101b]/92 border border-slate-600 text-[11px] font-black text-emerald-300 shadow-lg tabular-nums pointer-events-none">
         表示: 0 / 範囲内0件 (全0件)
@@ -282,13 +279,13 @@
       </button>
     </div>
 
-    <!-- 右下ズーム操作（z-index: 1050） -->
+    <!-- Bottom-Right Zoom Controls -->
     <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
       <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
       <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
     </div>
 
-    <!-- 左下デモパッド（デモON時のみ表示、z-index: 1050） -->
+    <!-- Bottom-Left Virtual Movement Pad (Demo Mode Only) -->
     <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-3 left-3 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
@@ -305,7 +302,7 @@
     </div>
   </main>
 
-  <!-- 下部パネル：ターゲット詳細・SV・位置修正・TSVコピー・大型操作ボタン（z-index: 1200） -->
+  <!-- Bottom Detail Drawer & Primary Action Bar -->
   <footer class="app-footer ui-lock-zoom bg-[#111827] border-t border-slate-800 px-3 pt-2 pb-2.5 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
     <div class="bg-[#0b101b]/95 border border-slate-800 rounded-2xl p-2.5 mb-2">
       <div class="flex items-center gap-1.5 flex-wrap">
@@ -356,7 +353,7 @@
     </div>
   </footer>
 
-  <!-- モーダル1：一覧検索・修正済TSV出力（z-index: 2500） -->
+  <!-- Modal 1: Nearby / Viewport List -->
   <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-3">
     <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
@@ -365,8 +362,11 @@
           <div id="list-summary" class="text-[11px] text-sky-400 font-bold tabular-nums">--</div>
         </div>
         <div class="flex items-center gap-1.5">
-          <button id="btn-open-data-modal" type="button" class="px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
-            読込/出力
+          <button id="btn-open-modified-manager" type="button" class="px-2.5 py-2 rounded-xl bg-amber-500/20 border border-amber-400/70 text-xs font-black text-amber-300 active:scale-95">
+            修正一覧 (<span id="list-mod-badge-num">0</span>)
+          </button>
+          <button id="btn-open-data-modal" type="button" class="px-2.5 py-2 rounded-xl bg-sky-500 text-slate-950 text-xs font-black active:scale-95">
+            読込/設定
           </button>
           <button type="button" data-close="modal-list" class="px-3 py-2 rounded-xl bg-[#1e293b] text-xs font-bold text-slate-300">
             閉じる
@@ -383,49 +383,79 @@
           </label>
           <span id="list-storage-info" class="text-[11px] text-slate-400 tabular-nums">--</span>
         </div>
-        <div id="list-modified-banner" class="hidden flex items-center justify-between bg-amber-500/15 border border-amber-400/50 px-3 py-2 rounded-xl">
-          <span id="list-modified-label" class="text-xs font-bold text-amber-300 tabular-nums">修正済: 0件</span>
-          <button id="btn-copy-all-tsv" type="button" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
-            全修正行TSVコピー
-          </button>
-        </div>
       </div>
 
       <div id="list-container" class="flex-1 overflow-y-auto p-3 space-y-2"></div>
     </div>
   </div>
 
-  <!-- モーダル2：13列データ読込・単体編集・TSV/CSV出力（z-index: 2500） -->
+  <!-- Modal 2: 13-Column Import / Fine Edit / Modified Hydrants Sheet Sync Manager -->
   <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-2.5 sm:p-4 overflow-y-auto">
-    <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto my-auto overflow-hidden shadow-2xl">
+    <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-xl mx-auto my-auto overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
-        <h2 id="data-modal-title" class="text-base font-black text-white">13列データ読込 / 編集 / 出力</h2>
+        <h2 id="data-modal-title" class="text-base font-black text-white">データ同期・編集・修正一覧管理</h2>
         <button type="button" data-close="modal-data" class="px-3 py-2 rounded-xl bg-[#1e293b] text-xs font-bold text-slate-300">
           閉じる
         </button>
       </div>
 
-      <div class="grid grid-cols-3 gap-1 bg-[#0b101b] p-1.5 border-b border-slate-800">
-        <button type="button" id="tab-import" class="py-2 rounded-lg text-xs font-black bg-amber-400 text-slate-950">シート読込</button>
-        <button type="button" id="tab-edit" class="py-2 rounded-lg text-xs font-bold text-slate-300">座標/メモ編集</button>
-        <button type="button" id="tab-export" class="py-2 rounded-lg text-xs font-bold text-slate-300">TSV/CSV出力</button>
+      <div class="grid grid-cols-4 gap-1 bg-[#0b101b] p-1.5 border-b border-slate-800">
+        <button type="button" id="tab-modified" class="py-2 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950">
+          修正一覧 (<span id="tab-mod-count">0</span>)
+        </button>
+        <button type="button" id="tab-import" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">シート同期</button>
+        <button type="button" id="tab-edit" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">詳細編集</button>
+        <button type="button" id="tab-export" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">TSV/CSV</button>
       </div>
 
       <div class="p-3.5 space-y-4 overflow-y-auto max-h-[78vh]">
-        <!-- 読込タブ -->
-        <div id="pane-import" class="space-y-3.5">
+        <!-- Tab 1: Modified Hydrants / Sheet Sync Manager -->
+        <div id="pane-modified" class="space-y-3">
+          <div class="bg-amber-500/10 border border-amber-400/50 rounded-xl p-3 space-y-2">
+            <div class="flex items-center justify-between gap-2 flex-wrap">
+              <div>
+                <div class="text-xs font-black text-amber-300">管理者向け：修正済み地点のシート反映リスト</div>
+                <div id="modified-manager-summary" class="text-[11px] text-slate-300 tabular-nums">修正済み: 0件</div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button id="btn-copy-all-tsv" type="button" class="px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
+                  全修正13列TSVコピー
+                </button>
+                <button id="btn-copy-summary-list" type="button" class="px-2.5 py-2 rounded-xl bg-[#1e293b] border border-amber-400/60 text-amber-200 text-xs font-bold active:scale-95">
+                  確認メモ出力
+                </button>
+              </div>
+            </div>
+            <p class="text-[11px] text-slate-300 leading-relaxed">
+              13列TSVをコピーし、スプレッドシートの該当番号（No.）行へ「値のみ貼り付け（Ctrl+Shift+V / Cmd+Shift+V）」で反映してください。再同期時、シート側が同一座標に更新されると自動で「修正済」が解除されます。
+            </p>
+          </div>
+
+          <div id="modified-list-container" class="space-y-2.5"></div>
+        </div>
+
+        <!-- Tab 2: Published CSV Sync & Import -->
+        <div id="pane-import" class="hidden space-y-3.5">
           <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
-            <div class="text-xs font-black text-sky-400">① 公開CSV URLから取得</div>
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-black text-sky-400">公開スプレッドシート CSV URL（自動同期対象）</span>
+              <span id="last-sync-status" class="text-[10px] text-slate-400 tabular-nums">未同期</span>
+            </div>
             <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
-            <button id="btn-fetch-csv" type="button" class="w-full py-2.5 rounded-xl bg-sky-500 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
-              URLから読み込み
-            </button>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btn-save-url" type="button" class="py-2.5 px-3 rounded-xl bg-[#1e293b] border border-slate-600 text-slate-100 font-bold text-xs active:scale-95">
+                URLを保存
+              </button>
+              <button id="btn-fetch-csv" type="button" class="py-2.5 px-3 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
+                今すぐ同期
+              </button>
+            </div>
           </div>
 
           <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
-            <div class="text-xs font-black text-amber-300">② スプレッドシート行を貼り付け（TSV / CSV）</div>
+            <div class="text-xs font-black text-amber-300">スプレッドシート行を貼り付け（TSV / CSV・13列）</div>
             <p class="text-[10px] text-slate-400">
-              列順: 1:番号 / 2:住所・地番 / 3:緯度 / 4:経度 / 5:市町村 / 6:位置メモ / 7:種別 / 8:規模 / 9:口径 / 10:備考 / 11:標識 / 12:地図グリッド / 13:SV URL
+              1:番号 / 2:住所・地番 / 3:緯度 / 4:経度 / 5:市町村 / 6:位置メモ / 7:種別 / 8:規模 / 9:口径 / 10:備考 / 11:標識 / 12:地図グリッド / 13:SV URL
             </p>
             <textarea id="paste-data-textarea" rows="3" placeholder="スプレッドシートからコピーした行を貼り付け..." class="w-full p-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-400"></textarea>
             <button id="btn-import-paste" type="button" class="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
@@ -434,7 +464,7 @@
           </div>
 
           <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
-            <div class="text-xs font-black text-emerald-300">③ CSV / TSVファイルを選択して読込（オフライン対応）</div>
+            <div class="text-xs font-black text-emerald-300">CSV / TSVファイルを選択して読込</div>
             <input id="file-upload-input" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-500 file:text-slate-950">
           </div>
 
@@ -448,7 +478,7 @@
           </div>
         </div>
 
-        <!-- 編集タブ -->
+        <!-- Tab 3: Fine Coordinate / Offset / 13-Column Edit -->
         <div id="pane-edit" class="hidden">
           <form id="edit-form" class="space-y-3">
             <input type="hidden" id="edit-id">
@@ -489,7 +519,7 @@
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-amber-300 mb-1">6: 位置メモ・目印（積雪期の基準点）</label>
+              <label class="block text-[11px] font-bold text-amber-300 mb-1">6: 位置メモ・目印（積雪期の基準点・オフセット）</label>
               <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
             </div>
 
@@ -529,15 +559,15 @@
           </form>
         </div>
 
-        <!-- 出力タブ -->
+        <!-- Tab 4: TSV / CSV Export -->
         <div id="pane-export" class="hidden space-y-3.5">
           <div class="bg-amber-500/10 border border-amber-400/50 p-3 rounded-xl space-y-2.5">
             <div class="flex items-center justify-between">
-              <span class="text-xs font-black text-amber-300">スプレッドシート貼付用 TSV出力</span>
+              <span class="text-xs font-black text-amber-300">スプレッドシート貼付用 TSV出力（13列）</span>
               <span id="export-mod-count" class="text-xs font-black text-white tabular-nums">修正済: 0件</span>
             </div>
             <p class="text-[11px] text-slate-300 leading-relaxed">
-              修正した行の13列タブ区切りテキストをコピーし、元スプレッドシートの該当行（番号・住所を確認）へ貼り付けて更新してください。
+              修正した行の13列タブ区切りテキストをコピーし、元スプレッドシートの該当行へ「値のみ貼り付け」してください。
             </p>
             <button id="btn-export-modified-tsv" type="button" class="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
               修正済みの全行をTSVコピー
@@ -552,7 +582,7 @@
     </div>
   </div>
 
-  <!-- トースト通知（z-index: 3000） -->
+  <!-- Toast Container -->
   <div id="toast-box" class="app-toast ui-lock-zoom fixed top-28 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-1.5 w-[92%] max-w-sm"></div>
 
   <script>
@@ -560,27 +590,36 @@
       'use strict';
 
       // =====================================================================
-      // 定数・初期データ（新発田市周辺）
+      // 公開スプレッドシートCSV URL設定（必要に応じてここにURLを設定）
+      // =====================================================================
+      const DEFAULT_PUBLISHED_CSV_URL = '';
+
+      // =====================================================================
+      // 描画・GPS・同期定数
       // =====================================================================
       const MAX_DISPLAY_ITEMS = 100;
       const GPS_MIN_INTERVAL_MS = 2000;
       const GPS_MIN_DISPLACEMENT_M = 5.0;
       const GPS_MAX_ACCURACY_M = 150.0;
       const VIEWPORT_DEBOUNCE_MS = 120;
+      const COORD_MATCH_EPSILON = 1e-5;
 
       const STORAGE_KEYS = {
-        DATA: 'shibata_hydrant_finder_v2_data',
-        URL: 'shibata_hydrant_finder_v2_url',
-        AUTOPAN: 'shibata_hydrant_finder_v2_autopan'
+        DATA: 'shibata_hydrant_finder_v3_data',
+        URL: 'shibata_hydrant_finder_v3_url',
+        AUTOPAN: 'shibata_hydrant_finder_v3_autopan',
+        LAST_SYNC: 'shibata_hydrant_finder_v3_last_sync'
       };
 
       const SAMPLE_SHIBATA_HYDRANTS = [
         {
-          id: 'sb-1',
+          id: 'sb-1001',
           no: '1001',
           address: '新発田市中央町3-3-3',
           lat: 37.94812,
           lon: 139.32755,
+          origLat: 37.94812,
+          origLon: 139.32755,
           city: '新発田市',
           offset: '市役所東側歩道・消火栓標識ポールから西へ1.5m',
           type: '地下式',
@@ -591,14 +630,17 @@
           grid: '4-C-2',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         },
         {
-          id: 'sb-2',
+          id: 'sb-1002',
           no: '1002',
           address: '新発田市諏訪町1-4-12',
           lat: 37.94585,
           lon: 139.33180,
+          origLat: 37.94585,
+          origLon: 139.33180,
           city: '新発田市',
           offset: '新発田駅西口交差点北側・赤色地上式消火栓',
           type: '地上式',
@@ -609,14 +651,17 @@
           grid: '4-D-4',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         },
         {
-          id: 'sb-3',
+          id: 'sb-1003',
           no: '1003',
           address: '新発田市大手町4-5-8',
           lat: 37.95160,
           lon: 139.32510,
+          origLat: 37.95160,
+          origLon: 139.32510,
           city: '新発田市',
           offset: '新発田城址公園南側・電柱巻付表示から南西へ2.0m',
           type: '地下式',
@@ -627,14 +672,17 @@
           grid: '3-B-3',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         },
         {
-          id: 'sb-4',
+          id: 'sb-1004',
           no: '1004',
           address: '新発田市本町2-1-15',
           lat: 37.94690,
           lon: 139.32920,
+          origLat: 37.94690,
+          origLon: 139.32920,
           city: '新発田市',
           offset: '本町通り歩道縁石際・地上式消火栓',
           type: '地上式',
@@ -645,14 +693,17 @@
           grid: '4-C-4',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         },
         {
-          id: 'sb-5',
+          id: 'sb-1005',
           no: '1005',
           address: '新発田市新栄町1-8-2',
           lat: 37.95340,
           lon: 139.33420,
+          origLat: 37.95340,
+          origLon: 139.33420,
           city: '新発田市',
           offset: '新栄町交差点南東角・標識柱から北へ1.2m',
           type: '地下式',
@@ -663,14 +714,17 @@
           grid: '3-E-1',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         },
         {
-          id: 'sb-6',
+          id: 'sb-1006',
           no: '1006',
           address: '新発田市舟入町2-6-10',
           lat: 37.94290,
           lon: 139.32480,
+          origLat: 37.94290,
+          origLon: 139.32480,
           city: '新発田市',
           offset: '舟入町住宅街・角地ブロック塀から道路側へ1.7m',
           type: '地下式',
@@ -681,6 +735,7 @@
           grid: '5-B-4',
           svUrl: '',
           modified: false,
+          modifiedAt: '',
           shiftMeters: 0
         }
       ];
@@ -695,6 +750,8 @@
         filterCity: 'all',
         autoPanOnTrack: false,
         isDemo: false,
+        isSyncing: false,
+        lastSyncAt: '',
         watchId: null,
         lastGpsAcceptedAt: 0,
         lastAcceptedLat: null,
@@ -738,7 +795,10 @@
         gnssDot: $('gnss-dot'),
         gnssStatus: $('gnss-status'),
         gnssAcc: $('gnss-acc'),
-        modifiedCountBadge: $('modified-count-badge'),
+        btnHeaderModified: $('btn-header-modified'),
+        modifiedCountNum: $('modified-count-num'),
+        btnSyncNow: $('btn-sync-now'),
+        syncLabel: $('sync-label'),
         btnAutopanToggle: $('btn-autopan-toggle'),
         autopanLabel: $('autopan-label'),
         btnDemoToggle: $('btn-demo-toggle'),
@@ -783,22 +843,30 @@
         btnOpenList: $('btn-open-list'),
         modalList: $('modal-list'),
         listSummary: $('list-summary'),
+        btnOpenModifiedManager: $('btn-open-modified-manager'),
+        listModBadgeNum: $('list-mod-badge-num'),
         btnOpenDataModal: $('btn-open-data-modal'),
         listSearch: $('list-search'),
         chkListBounds: $('chk-list-bounds'),
         listStorageInfo: $('list-storage-info'),
-        listModifiedBanner: $('list-modified-banner'),
-        listModifiedLabel: $('list-modified-label'),
-        btnCopyAllTsv: $('btn-copy-all-tsv'),
         listContainer: $('list-container'),
         modalData: $('modal-data'),
+        tabModified: $('tab-modified'),
+        tabModCount: $('tab-mod-count'),
         tabImport: $('tab-import'),
         tabEdit: $('tab-edit'),
         tabExport: $('tab-export'),
+        paneModified: $('pane-modified'),
         paneImport: $('pane-import'),
         paneEdit: $('pane-edit'),
         paneExport: $('pane-export'),
+        modifiedManagerSummary: $('modified-manager-summary'),
+        btnCopyAllTsv: $('btn-copy-all-tsv'),
+        btnCopySummaryList: $('btn-copy-summary-list'),
+        modifiedListContainer: $('modified-list-container'),
+        lastSyncStatus: $('last-sync-status'),
         csvUrlInput: $('csv-url-input'),
+        btnSaveUrl: $('btn-save-url'),
         btnFetchCsv: $('btn-fetch-csv'),
         pasteDataTextarea: $('paste-data-textarea'),
         btnImportPaste: $('btn-import-paste'),
@@ -917,7 +985,7 @@
         return 'other';
       }
 
-      /** ポップアップ・一覧・下部詳細で使う住所・地番（第2列）最優先表示 */
+      /** Address-first display priority: 2nd column (Address/Lot) -> Location Note -> No. */
       function getAddressPrimary(h) {
         if (!h) return '住所未登録';
         const addr = String(h.address || '').trim();
@@ -929,11 +997,18 @@
         return '住所未登録';
       }
 
+      function getEffectiveShiftMeters(h) {
+        if (typeof h.shiftMeters === 'number' && h.shiftMeters > 0) return h.shiftMeters;
+        if (typeof h.origLat === 'number' && typeof h.origLon === 'number') {
+          return Number(calcDistanceMeters(h.origLat, h.origLon, h.lat, h.lon).toFixed(1));
+        }
+        return 0;
+      }
+
       function cleanTsvField(val) {
         return String(val ?? '').replace(/[\r\n\t]+/g, ' ').trim();
       }
 
-      /** 13列TSV文字列生成: No., Address, Lat, Lon, Municipality, Location Note, Type, Scale, Diameter, Remarks, Signage, Map Grid, SV URL */
       function build13ColTsv(rows) {
         return rows
           .map((h) =>
@@ -953,6 +1028,20 @@
               cleanTsvField(h.svUrl)
             ].join('\t')
           )
+          .join('\n');
+      }
+
+      function buildAdminReviewText(rows) {
+        return rows
+          .map((h) => {
+            const addr = getAddressPrimary(h);
+            const oLat = typeof h.origLat === 'number' ? h.origLat.toFixed(6) : '--';
+            const oLon = typeof h.origLon === 'number' ? h.origLon.toFixed(6) : '--';
+            const nLat = Number(h.lat).toFixed(6);
+            const nLon = Number(h.lon).toFixed(6);
+            const shift = getEffectiveShiftMeters(h).toFixed(1);
+            return `[No.${h.no || '-'}] ${h.city ? h.city + ' ' : ''}${addr} | 移動:${shift}m | 元:(${oLat}, ${oLon}) → 新:(${nLat}, ${nLon}) | メモ:${h.offset || '-'}`;
+          })
           .join('\n');
       }
 
@@ -988,7 +1077,7 @@
       }
 
       // =====================================================================
-      // 13列 CSV / TSV パーサー＆ストレージ管理
+      // 13列 CSV / TSV パーサー・同期マージ・ストレージ管理
       // =====================================================================
       function parseRowsFromText(rawText) {
         const normalized = String(rawText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
@@ -1034,10 +1123,24 @@
         return rows;
       }
 
+      function isLikelyHeaderRow(cols) {
+        const c0 = String(cols[0] ?? '').toLowerCase();
+        const c2 = String(cols[2] ?? '').toLowerCase();
+        const c3 = String(cols[3] ?? '').toLowerCase();
+        const latNum = parseFloat(cols[2]);
+        const lonNum = parseFloat(cols[3]);
+        if (Number.isNaN(latNum) || Number.isNaN(lonNum)) return true;
+        if (c0 === 'no' || c0 === 'no.' || c0 === '番号' || c0 === 'id') return true;
+        if (c2.includes('lat') || c2.includes('緯度') || c3.includes('lon') || c3.includes('経度')) return true;
+        return false;
+      }
+
       function map13ColsToHydrants(rows) {
         const items = [];
         for (let idx = 0; idx < rows.length; idx++) {
           const cols = rows[idx];
+          if (idx === 0 && isLikelyHeaderRow(cols)) continue;
+
           const lat = parseFloat(cols[2]);
           const lon = parseFloat(cols[3]);
           if (Number.isNaN(lat) || Number.isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
@@ -1063,6 +1166,8 @@
             address,
             lat,
             lon,
+            origLat: lat,
+            origLon: lon,
             city,
             offset,
             type,
@@ -1073,10 +1178,93 @@
             grid,
             svUrl,
             modified: false,
+            modifiedAt: '',
             shiftMeters: 0
           });
         }
         return items;
+      }
+
+      /**
+       * 上流（CSV/シート）データとローカル状態をマージする。
+       * ローカルで修正済（modified === true）の地点は座標・位置メモ・修正状態を保護する。
+       * ただし、上流の座標がローカル修正座標と COORD_MATCH_EPSILON 以内で一致した場合は
+       * 「シート側へ反映済み」とみなして modified フラグを解除する。
+       */
+      function mergeUpstreamHydrants(upstreamItems, existingItems) {
+        const byNo = new Map();
+        const byCoordKey = new Map();
+
+        if (Array.isArray(existingItems)) {
+          for (let i = 0; i < existingItems.length; i++) {
+            const ex = existingItems[i];
+            if (ex.no) byNo.set(String(ex.no).trim(), ex);
+            const ck = `${Number(ex.origLat ?? ex.lat).toFixed(6)},${Number(ex.origLon ?? ex.lon).toFixed(6)}`;
+            if (!byCoordKey.has(ck)) byCoordKey.set(ck, ex);
+          }
+        }
+
+        return upstreamItems.map((up) => {
+          const match =
+            (up.no && byNo.get(String(up.no).trim())) ||
+            byCoordKey.get(`${Number(up.lat).toFixed(6)},${Number(up.lon).toFixed(6)}`) ||
+            null;
+
+          if (!match) {
+            return up;
+          }
+
+          if (match.modified) {
+            const matchesUpstream =
+              Math.abs(Number(match.lat) - Number(up.lat)) <= COORD_MATCH_EPSILON &&
+              Math.abs(Number(match.lon) - Number(up.lon)) <= COORD_MATCH_EPSILON;
+
+            if (matchesUpstream) {
+              return {
+                ...up,
+                id: match.id,
+                origLat: up.lat,
+                origLon: up.lon,
+                modified: false,
+                modifiedAt: '',
+                shiftMeters: 0
+              };
+            }
+
+            return {
+              ...up,
+              id: match.id,
+              lat: match.lat,
+              lon: match.lon,
+              origLat: up.lat,
+              origLon: up.lon,
+              offset: match.offset || up.offset,
+              modified: true,
+              modifiedAt: match.modifiedAt || '',
+              shiftMeters: Number(calcDistanceMeters(up.lat, up.lon, match.lat, match.lon).toFixed(1))
+            };
+          }
+
+          return {
+            ...up,
+            id: match.id,
+            origLat: up.lat,
+            origLon: up.lon,
+            modified: false,
+            modifiedAt: '',
+            shiftMeters: 0
+          };
+        });
+      }
+
+      function getConfiguredCsvUrl() {
+        const stored = dom.csvUrlInput && String(dom.csvUrlInput.value || '').trim();
+        if (stored) return stored;
+        try {
+          const lsUrl = localStorage.getItem(STORAGE_KEYS.URL);
+          if (lsUrl && lsUrl.trim()) return lsUrl.trim();
+        } catch (e) {}
+        return String(DEFAULT_PUBLISHED_CSV_URL || '').trim();
       }
 
       function saveToStorage() {
@@ -1092,34 +1280,131 @@
         }
       }
 
+      function updateLastSyncLabel(tsStr) {
+        state.lastSyncAt = tsStr || '';
+        if (tsStr) {
+          try {
+            localStorage.setItem(STORAGE_KEYS.LAST_SYNC, tsStr);
+          } catch (e) {}
+        }
+        if (dom.lastSyncStatus) {
+          dom.lastSyncStatus.textContent = state.lastSyncAt ? `最終同期: ${state.lastSyncAt}` : '未同期';
+        }
+      }
+
       function loadFromStorage() {
+        let hasCachedData = false;
         try {
           const raw = localStorage.getItem(STORAGE_KEYS.DATA);
           if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              state.hydrants = parsed;
+              state.hydrants = parsed.map((h) => ({
+                ...h,
+                origLat: typeof h.origLat === 'number' ? h.origLat : h.lat,
+                origLon: typeof h.origLon === 'number' ? h.origLon : h.lon,
+                modified: Boolean(h.modified),
+                modifiedAt: h.modifiedAt || '',
+                shiftMeters: typeof h.shiftMeters === 'number' ? h.shiftMeters : 0
+              }));
+              hasCachedData = true;
               const kb = (raw.length / 1024).toFixed(1);
               if (dom.listStorageInfo) {
                 dom.listStorageInfo.textContent = `全${state.hydrants.length}件 (${kb}KB)`;
               }
             }
           }
+
           const savedUrl = localStorage.getItem(STORAGE_KEYS.URL);
-          if (savedUrl && dom.csvUrlInput) {
-            dom.csvUrlInput.value = savedUrl;
+          const effectiveUrl = (savedUrl && savedUrl.trim()) || DEFAULT_PUBLISHED_CSV_URL;
+          if (dom.csvUrlInput && effectiveUrl) {
+            dom.csvUrlInput.value = effectiveUrl;
           }
+
           const savedAutopan = localStorage.getItem(STORAGE_KEYS.AUTOPAN);
           if (savedAutopan !== null) {
             state.autoPanOnTrack = savedAutopan === 'true';
           }
+
+          const savedSync = localStorage.getItem(STORAGE_KEYS.LAST_SYNC);
+          if (savedSync) {
+            updateLastSyncLabel(savedSync);
+          }
         } catch (err) {
-          // ストレージアクセス失敗時はサンプルへフォールバック
+          // Fallback to sample data if storage fails
         }
 
-        if (!state.hydrants || state.hydrants.length === 0) {
+        if (!hasCachedData || !state.hydrants || state.hydrants.length === 0) {
           state.hydrants = JSON.parse(JSON.stringify(SAMPLE_SHIBATA_HYDRANTS));
           saveToStorage();
+        }
+        return hasCachedData;
+      }
+
+      async function syncFromPublishedCsv({ silent = false, focusFirst = false } = {}) {
+        const url = getConfiguredCsvUrl();
+        if (!url) {
+          if (!silent) {
+            showToast('公開CSV URLが未設定です。「読込/設定」タブでURLを入力してください', 'warn');
+          }
+          return false;
+        }
+        if (state.isSyncing) return false;
+
+        state.isSyncing = true;
+        if (dom.syncLabel) dom.syncLabel.textContent = '同期中...';
+        if (dom.btnFetchCsv) {
+          dom.btnFetchCsv.disabled = true;
+          dom.btnFetchCsv.textContent = '同期中...';
+        }
+
+        try {
+          const sep = url.includes('?') ? '&' : '?';
+          const fetchUrl = `${url}${sep}_ts=${Date.now()}`;
+          const res = await fetch(fetchUrl, { cache: 'no-store' });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const text = await res.text();
+          const rows = parseRowsFromText(text);
+          const parsed = map13ColsToHydrants(rows);
+          if (parsed.length === 0) {
+            throw new Error('有効な13列データが見つかりません');
+          }
+
+          const prevSelected = getSelectedHydrant();
+          const merged = mergeUpstreamHydrants(parsed, state.hydrants);
+          state.hydrants = merged;
+
+          if (focusFirst || !prevSelected || !merged.some((h) => h.id === prevSelected.id)) {
+            state.selectedId = merged[0].id;
+            if (mapRef.map && focusFirst) {
+              mapRef.map.setView([merged[0].lat, merged[0].lon], 16, { animate: false });
+            }
+          }
+
+          const nowStr = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+          updateLastSyncLabel(nowStr);
+          saveToStorage();
+          rebuildCityOptions();
+          updateGnssHeader();
+          updateDetailAndHud();
+          renderViewportMarkers();
+
+          if (!silent) {
+            showToast(`公開CSVと同期しました（${merged.length}件・修正分保護済）`, 'success');
+          }
+          return true;
+        } catch (err) {
+          if (!silent) {
+            showToast('CSV同期に失敗しました。公開URLと共有設定を確認してください', 'error');
+          }
+          return false;
+        } finally {
+          state.isSyncing = false;
+          if (dom.syncLabel) dom.syncLabel.textContent = '同期';
+          if (dom.btnFetchCsv) {
+            dom.btnFetchCsv.disabled = false;
+            dom.btnFetchCsv.textContent = '今すぐ同期';
+          }
         }
       }
 
@@ -1215,7 +1500,7 @@
             .map((entry) => entry.h);
         }
 
-        // 選択中のターゲットは常に保持
+        // Always keep selected hydrant visible even if outside viewport or truncated
         if (selected && !selectedList.some((h) => h.id === selected.id)) {
           if (selectedList.length >= MAX_DISPLAY_ITEMS) {
             selectedList[selectedList.length - 1] = selected;
@@ -1310,11 +1595,11 @@
       }
 
       /**
-       * 文字・地番を一切表示しないコンパクトな幾何シンボルアイコンを生成
-       * - 地下式: 18px〜22px シアン円形 + 白枠 + 内側リング/ドット
-       * - 地上式: 18px〜22px レッド角丸スクエア + 白枠 + 内側白ドット
-       * - 選択中: ゴールド外周リング + 脈動アニメーション
-       * - 修正済: 右上に小さな黄色ドットバッジ
+       * Text-free compact geometric symbols:
+       * - Underground (地下式): Cyan circle with white border and inner ring
+       * - Aboveground (地上式): Red rounded square with white border and inner dot
+       * - Active selection: Gold border + pulse highlight
+       * - Modified: Tiny yellow indicator dot on top-right
        */
       function createSymbolIcon(h, isSelected) {
         const kind = getTypeKind(h.type);
@@ -1324,7 +1609,6 @@
         const boxSize = isSelected ? 24 : 20;
         const half = boxSize / 2;
 
-        // 修正済を示す極小イエロードット（文字なし）
         const modDot = h.modified
           ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #0b101b;box-shadow:0 1px 3px rgba(0,0,0,0.8);"></span>`
           : '';
@@ -1334,7 +1618,6 @@
 
         let innerShapeHtml = '';
         if (isUg) {
-          // 地下式：シアン円形 + 内側リング
           innerShapeHtml = `
             <div class="${pulseCls}" style="
               position:relative;
@@ -1353,7 +1636,6 @@
             </div>
           `;
         } else if (isAg) {
-          // 地上式：レッド角丸スクエア + 内側白ドット
           innerShapeHtml = `
             <div class="${pulseCls}" style="
               position:relative;
@@ -1372,7 +1654,6 @@
             </div>
           `;
         } else {
-          // その他（防火水槽等）：アンバー角丸 + 内側枠
           innerShapeHtml = `
             <div class="${pulseCls}" style="
               position:relative;
@@ -1473,7 +1754,6 @@
           marker.addTo(mapRef.hydrantGroup);
         }
 
-        // 位置修正中のドラッグピン・元位置マーカー表示
         mapRef.relocateGroup.clearLayers();
         if (state.relocate.active) {
           const r = state.relocate;
@@ -1529,7 +1809,6 @@
           });
         }
 
-        // ユーザー現在地と誤差円・経路線の更新
         if (state.userPos.lat !== null && state.userPos.lon !== null) {
           const uLatLng = [state.userPos.lat, state.userPos.lon];
           const acc = Math.max(2, Number(state.userPos.accuracy || 10));
@@ -1583,11 +1862,14 @@
         if (!target || !mapRef.map) return;
 
         state.selectedId = target.id;
+        const baseLat = typeof target.origLat === 'number' ? target.origLat : target.lat;
+        const baseLon = typeof target.origLon === 'number' ? target.origLon : target.lon;
+
         state.relocate = {
           active: true,
           targetId: target.id,
-          origLat: target.lat,
-          origLon: target.lon,
+          origLat: baseLat,
+          origLon: baseLon,
           draftLat: target.lat,
           draftLon: target.lon
         };
@@ -1633,13 +1915,21 @@
         if (saveChanges) {
           const idx = state.hydrants.findIndex((h) => h.id === r.targetId);
           if (idx !== -1) {
-            const moved = calcDistanceMeters(r.origLat, r.origLon, r.draftLat, r.draftLon);
-            state.hydrants[idx].lat = Number(r.draftLat.toFixed(6));
-            state.hydrants[idx].lon = Number(r.draftLon.toFixed(6));
+            const nLat = Number(r.draftLat.toFixed(6));
+            const nLon = Number(r.draftLon.toFixed(6));
+            const origLat = typeof state.hydrants[idx].origLat === 'number' ? state.hydrants[idx].origLat : r.origLat;
+            const origLon = typeof state.hydrants[idx].origLon === 'number' ? state.hydrants[idx].origLon : r.origLon;
+            const totalShift = Number(calcDistanceMeters(origLat, origLon, nLat, nLon).toFixed(1));
+
+            state.hydrants[idx].origLat = origLat;
+            state.hydrants[idx].origLon = origLon;
+            state.hydrants[idx].lat = nLat;
+            state.hydrants[idx].lon = nLon;
             state.hydrants[idx].modified = true;
-            state.hydrants[idx].shiftMeters = Number(((state.hydrants[idx].shiftMeters || 0) + moved).toFixed(1));
+            state.hydrants[idx].modifiedAt = new Date().toLocaleString('ja-JP', { hour12: false });
+            state.hydrants[idx].shiftMeters = totalShift;
             saveToStorage();
-            showToast(`位置を修正しました（移動 ${moved.toFixed(1)}m）`, 'success');
+            showToast(`位置を修正しました（累計移動 ${totalShift.toFixed(1)}m）`, 'success');
           }
         } else {
           showToast('位置修正をキャンセルしました', 'info');
@@ -1784,12 +2074,12 @@
             accuracy: 5.0
           };
           state.heading = 35;
-          if (dom.demoLabel) dom.demoLabel.textContent = 'デモ: ON';
+          if (dom.demoLabel) dom.demoLabel.textContent = 'デモ:ON';
           if (dom.demoPad) dom.demoPad.classList.remove('hidden');
           if (mapRef.map) mapRef.map.setView([state.userPos.lat, state.userPos.lon], 17, { animate: false });
           showToast('デモモードON（新発田市周辺で仮想移動可能）', 'info');
         } else {
-          if (dom.demoLabel) dom.demoLabel.textContent = 'デモ: OFF';
+          if (dom.demoLabel) dom.demoLabel.textContent = 'デモ:OFF';
           if (dom.demoPad) dom.demoPad.classList.add('hidden');
           showToast('デモモードOFF', 'info');
         }
@@ -1814,23 +2104,31 @@
       }
 
       // =====================================================================
-      // UI更新・一覧・モーダル制御
+      // UI更新・修正一覧マネージャ・モーダル制御
       // =====================================================================
       function syncToggleButtonsUI() {
         if (dom.autopanLabel) {
           dom.autopanLabel.textContent = state.autoPanOnTrack ? 'ON' : 'OFF';
-          dom.autopanLabel.className = state.autoPanOnTrack ? 'text-emerald-400 font-black' : 'text-sky-400 font-black';
+          dom.autopanLabel.className = state.autoPanOnTrack
+            ? 'text-emerald-400 font-black ml-0.5'
+            : 'text-sky-400 font-black ml-0.5';
         }
       }
 
       function updateGnssHeader() {
         const modTotal = state.hydrants.filter((h) => h.modified).length;
-        if (dom.modifiedCountBadge) {
+        if (dom.modifiedCountNum) dom.modifiedCountNum.textContent = String(modTotal);
+        if (dom.listModBadgeNum) dom.listModBadgeNum.textContent = String(modTotal);
+        if (dom.tabModCount) dom.tabModCount.textContent = String(modTotal);
+        if (dom.exportModCount) dom.exportModCount.textContent = `修正済: ${modTotal}件`;
+
+        if (dom.btnHeaderModified) {
           if (modTotal > 0) {
-            dom.modifiedCountBadge.textContent = `修正: ${modTotal}件`;
-            dom.modifiedCountBadge.classList.remove('hidden');
+            dom.btnHeaderModified.classList.remove('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+            dom.btnHeaderModified.classList.add('bg-amber-500/20', 'border-amber-400/70', 'text-amber-300');
           } else {
-            dom.modifiedCountBadge.classList.add('hidden');
+            dom.btnHeaderModified.classList.remove('bg-amber-500/20', 'border-amber-400/70', 'text-amber-300');
+            dom.btnHeaderModified.classList.add('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
           }
         }
 
@@ -1864,6 +2162,7 @@
 
         const kind = getTypeKind(h.type);
         const addr = getAddressPrimary(h);
+        const shift = getEffectiveShiftMeters(h);
 
         if (dom.detailNo) dom.detailNo.textContent = h.no ? `No.${h.no}` : 'No.--';
         if (dom.detailType) {
@@ -1890,7 +2189,7 @@
 
         if (dom.detailMod && dom.btnCopyOneTsv) {
           if (h.modified) {
-            dom.detailMod.textContent = h.shiftMeters > 0 ? `修正済(${h.shiftMeters}m)` : '修正済';
+            dom.detailMod.textContent = shift > 0 ? `修正済(${shift}m)` : '修正済';
             dom.detailMod.classList.remove('hidden');
             dom.btnCopyOneTsv.classList.remove('hidden');
           } else {
@@ -1964,16 +2263,6 @@
       function renderListModal() {
         if (!dom.listContainer) return;
         dom.listContainer.innerHTML = '';
-
-        const modRows = state.hydrants.filter((h) => h.modified);
-        if (dom.listModifiedBanner && dom.listModifiedLabel) {
-          if (modRows.length > 0) {
-            dom.listModifiedBanner.classList.remove('hidden');
-            dom.listModifiedLabel.textContent = `修正済: ${modRows.length}件`;
-          } else {
-            dom.listModifiedBanner.classList.add('hidden');
-          }
-        }
 
         let candidates = getFilteredList();
         if (dom.chkListBounds && dom.chkListBounds.checked && mapRef.map) {
@@ -2065,28 +2354,136 @@
         });
       }
 
+      function renderModifiedManager() {
+        if (!dom.modifiedListContainer) return;
+        const modRows = state.hydrants.filter((h) => h.modified);
+
+        if (dom.modifiedManagerSummary) {
+          const totalShift = modRows.reduce((acc, h) => acc + getEffectiveShiftMeters(h), 0);
+          dom.modifiedManagerSummary.textContent = `未反映の修正済み: ${modRows.length}件（累計移動 ${totalShift.toFixed(1)}m）`;
+        }
+
+        dom.modifiedListContainer.innerHTML = '';
+        if (modRows.length === 0) {
+          dom.modifiedListContainer.innerHTML = `
+            <div class="text-center text-slate-400 py-8 px-4 rounded-2xl bg-[#0b101b]/70 border border-slate-800 text-xs leading-relaxed">
+              現在、未反映の修正済み地点はありません。<br>
+              地図上のシンボルから「位置を修正」または「数値/メモ編集」を行うとここへ表示されます。
+            </div>
+          `;
+          return;
+        }
+
+        modRows.forEach((h) => {
+          const addr = getAddressPrimary(h);
+          const oLat = typeof h.origLat === 'number' ? h.origLat.toFixed(6) : '--';
+          const oLon = typeof h.origLon === 'number' ? h.origLon.toFixed(6) : '--';
+          const nLat = Number(h.lat).toFixed(6);
+          const nLon = Number(h.lon).toFixed(6);
+          const shift = getEffectiveShiftMeters(h).toFixed(1);
+
+          const card = document.createElement('div');
+          card.className = 'bg-[#0b101b] border border-amber-400/40 rounded-2xl p-3 space-y-2';
+          card.innerHTML = `
+            <div class="flex items-start justify-between gap-2">
+              <div class="min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black tabular-nums">No.${escapeHtml(h.no || '--')}</span>
+                  <span class="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[11px] font-black tabular-nums">移動 ${shift}m</span>
+                  ${h.modifiedAt ? `<span class="text-[10px] text-slate-400 tabular-nums">${escapeHtml(h.modifiedAt)}</span>` : ''}
+                </div>
+                <div class="text-sm font-black text-white mt-1 truncate">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(addr)}</div>
+              </div>
+              <button type="button" data-action="locate" class="shrink-0 px-2.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-400/60 text-sky-300 text-[11px] font-black active:scale-95">
+                地図表示
+              </button>
+            </div>
+
+            <div class="bg-[#111827] border border-slate-800 rounded-xl p-2 text-[11px] font-mono space-y-1 tabular-nums">
+              <div class="text-slate-400">元座標: <span class="text-slate-300">${oLat}, ${oLon}</span></div>
+              <div class="text-emerald-300 font-bold">新座標: <span class="text-white">${nLat}, ${nLon}</span></div>
+              <div class="font-sans text-amber-200 font-bold truncate">メモ: ${escapeHtml(h.offset || '--')}</div>
+            </div>
+
+            <div class="grid grid-cols-3 gap-1.5">
+              <button type="button" data-action="copy-tsv" class="py-2 px-2 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
+                13列行TSVコピー
+              </button>
+              <button type="button" data-action="copy-coords" class="py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-sky-300 text-[11px] font-bold active:scale-95">
+                緯度経度コピー
+              </button>
+              <button type="button" data-action="revert" class="py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-700 text-rose-300 text-[11px] font-bold active:scale-95">
+                元座標に戻す
+              </button>
+            </div>
+          `;
+
+          card.querySelector('[data-action="locate"]').addEventListener('click', () => {
+            state.selectedId = h.id;
+            if (dom.modalData) dom.modalData.classList.add('hidden');
+            if (mapRef.map) {
+              mapRef.map.setView([h.lat, h.lon], Math.max(mapRef.map.getZoom(), 18), { animate: true });
+            }
+            updateDetailAndHud();
+            renderViewportMarkers();
+          });
+
+          card.querySelector('[data-action="copy-tsv"]').addEventListener('click', () => {
+            copyToClipboard(build13ColTsv([h]), `${addr} の13列TSVをコピーしました`);
+          });
+
+          card.querySelector('[data-action="copy-coords"]').addEventListener('click', () => {
+            copyToClipboard(`${nLat}\t${nLon}`, `${addr} の緯度・経度（${nLat}, ${nLon}）をコピーしました`);
+          });
+
+          card.querySelector('[data-action="revert"]').addEventListener('click', () => {
+            const idx = state.hydrants.findIndex((item) => item.id === h.id);
+            if (idx === -1) return;
+            if (typeof state.hydrants[idx].origLat === 'number' && typeof state.hydrants[idx].origLon === 'number') {
+              state.hydrants[idx].lat = state.hydrants[idx].origLat;
+              state.hydrants[idx].lon = state.hydrants[idx].origLon;
+            }
+            state.hydrants[idx].modified = false;
+            state.hydrants[idx].modifiedAt = '';
+            state.hydrants[idx].shiftMeters = 0;
+            saveToStorage();
+            updateGnssHeader();
+            updateDetailAndHud();
+            renderViewportMarkers();
+            renderModifiedManager();
+            showToast(`${addr} を元の座標に戻しました`, 'info');
+          });
+
+          dom.modifiedListContainer.appendChild(card);
+        });
+      }
+
       function switchDataTab(tabName) {
         const tabs = {
+          modified: { btn: dom.tabModified, pane: dom.paneModified },
           import: { btn: dom.tabImport, pane: dom.paneImport },
           edit: { btn: dom.tabEdit, pane: dom.paneEdit },
           export: { btn: dom.tabExport, pane: dom.paneExport }
         };
+
         Object.entries(tabs).forEach(([key, obj]) => {
           const active = key === tabName;
           if (obj.btn) {
             obj.btn.className = active
-              ? 'py-2 rounded-lg text-xs font-black bg-amber-400 text-slate-950'
-              : 'py-2 rounded-lg text-xs font-bold text-slate-300';
+              ? 'py-2 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950'
+              : 'py-2 rounded-lg text-[11px] font-bold text-slate-300';
           }
           if (obj.pane) obj.pane.classList.toggle('hidden', !active);
         });
+
+        if (tabName === 'modified') renderModifiedManager();
         if (tabName === 'export' && dom.exportModCount) {
           const c = state.hydrants.filter((h) => h.modified).length;
           dom.exportModCount.textContent = `修正済: ${c}件`;
         }
       }
 
-      function openDataModal(tabName = 'import') {
+      function openDataModal(tabName = 'modified') {
         const h = getSelectedHydrant();
         if (h && dom.editId) {
           dom.editId.value = h.id;
@@ -2104,6 +2501,10 @@
           dom.editRemarks.value = h.remarks || '';
           dom.editSv.value = h.svUrl || '';
         }
+        const effectiveUrl = getConfiguredCsvUrl();
+        if (dom.csvUrlInput && effectiveUrl) {
+          dom.csvUrlInput.value = effectiveUrl;
+        }
         switchDataTab(tabName);
         if (dom.modalData) dom.modalData.classList.remove('hidden');
       }
@@ -2114,18 +2515,19 @@
           showToast('有効な緯度・経度を含む13列データが見つかりませんでした', 'error');
           return;
         }
-        state.hydrants = parsed;
-        state.selectedId = parsed[0].id;
+        const merged = mergeUpstreamHydrants(parsed, state.hydrants);
+        state.hydrants = merged;
+        state.selectedId = merged[0].id;
         saveToStorage();
         rebuildCityOptions();
         if (mapRef.map) {
-          mapRef.map.setView([parsed[0].lat, parsed[0].lon], 16, { animate: false });
+          mapRef.map.setView([merged[0].lat, merged[0].lon], 16, { animate: false });
         }
         updateGnssHeader();
         updateDetailAndHud();
         renderViewportMarkers();
         if (dom.modalData) dom.modalData.classList.add('hidden');
-        showToast(`${sourceName}から ${parsed.length} 件を読み込みました`, 'success');
+        showToast(`${sourceName}から ${merged.length} 件を読み込みました（修正分保護済）`, 'success');
       }
 
       function downloadCsvFile() {
@@ -2218,6 +2620,16 @@
             state.filterCity = e.target.value;
             updateDetailAndHud();
             renderViewportMarkers();
+          });
+        }
+
+        if (dom.btnHeaderModified) {
+          dom.btnHeaderModified.addEventListener('click', () => openDataModal('modified'));
+        }
+
+        if (dom.btnSyncNow) {
+          dom.btnSyncNow.addEventListener('click', () => {
+            syncFromPublishedCsv({ silent: false, focusFirst: false });
           });
         }
 
@@ -2318,6 +2730,13 @@
         if (dom.listSearch) dom.listSearch.addEventListener('input', renderListModal);
         if (dom.chkListBounds) dom.chkListBounds.addEventListener('change', renderListModal);
 
+        if (dom.btnOpenModifiedManager) {
+          dom.btnOpenModifiedManager.addEventListener('click', () => {
+            if (dom.modalList) dom.modalList.classList.add('hidden');
+            openDataModal('modified');
+          });
+        }
+
         if (dom.btnOpenDataModal) {
           dom.btnOpenDataModal.addEventListener('click', () => {
             if (dom.modalList) dom.modalList.classList.add('hidden');
@@ -2333,33 +2752,34 @@
           });
         });
 
+        if (dom.tabModified) dom.tabModified.addEventListener('click', () => switchDataTab('modified'));
         if (dom.tabImport) dom.tabImport.addEventListener('click', () => switchDataTab('import'));
         if (dom.tabEdit) dom.tabEdit.addEventListener('click', () => switchDataTab('edit'));
         if (dom.tabExport) dom.tabExport.addEventListener('click', () => switchDataTab('export'));
 
-        if (dom.btnFetchCsv) {
-          dom.btnFetchCsv.addEventListener('click', async () => {
+        if (dom.btnSaveUrl) {
+          dom.btnSaveUrl.addEventListener('click', () => {
             const url = String(dom.csvUrlInput ? dom.csvUrlInput.value : '').trim();
-            if (!url) {
-              showToast('公開CSV URLを入力してください', 'warn');
-              return;
-            }
             try {
-              localStorage.setItem(STORAGE_KEYS.URL, url);
+              if (url) {
+                localStorage.setItem(STORAGE_KEYS.URL, url);
+              } else {
+                localStorage.removeItem(STORAGE_KEYS.URL);
+              }
             } catch (e) {}
-            dom.btnFetchCsv.disabled = true;
-            dom.btnFetchCsv.textContent = '取得中...';
-            try {
-              const res = await fetch(url);
-              if (!res.ok) throw new Error(`HTTP ${res.status}`);
-              const txt = await res.text();
-              ingestRows(parseRowsFromText(txt), 'CSV URL');
-            } catch (err) {
-              showToast('CSV取得に失敗しました。URLの公開設定を確認してください', 'error');
-            } finally {
-              dom.btnFetchCsv.disabled = false;
-              dom.btnFetchCsv.textContent = 'URLから読み込み';
+            showToast(url ? '公開CSV URLを保存しました' : '保存URLをクリアしました', 'success');
+          });
+        }
+
+        if (dom.btnFetchCsv) {
+          dom.btnFetchCsv.addEventListener('click', () => {
+            const url = String(dom.csvUrlInput ? dom.csvUrlInput.value : '').trim();
+            if (url) {
+              try {
+                localStorage.setItem(STORAGE_KEYS.URL, url);
+              } catch (e) {}
             }
+            syncFromPublishedCsv({ silent: false, focusFirst: false });
           });
         }
 
@@ -2437,7 +2857,10 @@
               return;
             }
 
-            const moved = calcDistanceMeters(prev.lat, prev.lon, nLat, nLon);
+            const origLat = typeof prev.origLat === 'number' ? prev.origLat : prev.lat;
+            const origLon = typeof prev.origLon === 'number' ? prev.origLon : prev.lon;
+            const totalShift = Number(calcDistanceMeters(origLat, origLon, nLat, nLon).toFixed(1));
+
             state.hydrants[idx] = {
               ...prev,
               no: dom.editNo.value.trim(),
@@ -2446,6 +2869,8 @@
               address: dom.editAddress.value.trim(),
               lat: nLat,
               lon: nLon,
+              origLat,
+              origLon,
               offset: dom.editMemo.value.trim() || '位置メモ未登録',
               scale: dom.editScale.value.trim(),
               diameter: dom.editDiameter.value.trim(),
@@ -2454,7 +2879,8 @@
               remarks: dom.editRemarks.value.trim(),
               svUrl: dom.editSv.value.trim(),
               modified: true,
-              shiftMeters: Number(((prev.shiftMeters || 0) + moved).toFixed(1))
+              modifiedAt: new Date().toLocaleString('ja-JP', { hour12: false }),
+              shiftMeters: totalShift
             };
 
             saveToStorage();
@@ -2473,6 +2899,14 @@
         };
         if (dom.btnCopyAllTsv) dom.btnCopyAllTsv.addEventListener('click', copyAllModified);
         if (dom.btnExportModifiedTsv) dom.btnExportModifiedTsv.addEventListener('click', copyAllModified);
+
+        if (dom.btnCopySummaryList) {
+          dom.btnCopySummaryList.addEventListener('click', () => {
+            const modRows = state.hydrants.filter((h) => h.modified);
+            copyToClipboard(buildAdminReviewText(modRows), `修正済み ${modRows.length} 件の確認メモをコピーしました`);
+          });
+        }
+
         if (dom.btnDownloadCsv) dom.btnDownloadCsv.addEventListener('click', downloadCsvFile);
 
         window.addEventListener('resize', () => {
@@ -2484,10 +2918,10 @@
       }
 
       // =====================================================================
-      // 初期化エントリポイント
+      // 初期化エントリポイント（キャッシュ即時描画＋公開CSVバックグラウンド同期）
       // =====================================================================
       window.addEventListener('DOMContentLoaded', () => {
-        loadFromStorage();
+        const hadCachedData = loadFromStorage();
         rebuildCityOptions();
         const list = getFilteredList();
         state.selectedId = (list[0] || state.hydrants[0]).id;
@@ -2495,6 +2929,10 @@
         bindEvents();
         updateGnssHeader();
         updateDetailAndHud();
+
+        if (getConfiguredCsvUrl()) {
+          syncFromPublishedCsv({ silent: hadCachedData, focusFirst: !hadCachedData });
+        }
       });
     })();
   </script>
