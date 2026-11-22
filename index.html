@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <!-- 意図しないピンチズームやダブルタップ拡大を防止し、現場での誤操作を防ぐ設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>積雪期 水利・消火栓探索レーダー＆マップ</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Leaflet.js CSS & JS CDN (通信圏外でもレーダーは動作するようフォールバック対応) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <!-- Google Fonts: Inter & Noto Sans JP -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+  
+  <style>
+    /* 基本リセットとタッチ操作の最適化 */
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation; /* ダブルタップズーム無効化 */
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      background-color: #0b0f19;
+      color: #f8fafc;
+      font-family: 'Inter', 'Noto Sans JP', sans-serif;
+      overscroll-behavior: none;
+      user-select: none;
+    }
+
+    /* 手袋操作を想定した大型ボタン共通スタイル */
+    .glove-btn {
+      min-height: 56px;
+      border-radius: 14px;
+      font-weight: 700;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.1s ease, background-color 0.15s ease;
+    }
+    .glove-btn:active {
+      transform: scale(0.97);
+    }
+
+    /* カスタムスクロールバー（モーダル内リスト用） */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0b0f19;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+
+    /* 数値の等幅表示（距離や座標のガタつき防止） */
+    .tabular-nums {
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* Leaflet 地図コンテナとヘディングアップ回転用ラッパー */
+    #map-wrapper {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #0b0f19;
+    }
+    #leaflet-map-rotator {
+      position: absolute;
+      /* 回転時に四隅が切れないよう画面より大きく確保 */
+      top: -35%;
+      left: -35%;
+      width: 170%;
+      height: 170%;
+      transition: transform 0.2s ease-out;
+      transform-origin: center center;
+    }
+    #leaflet-map {
+      width: 100%;
+      height: 100%;
+      background-color: #0b0f19;
+    }
+    /* Leafletのデフォルトコントロールをダークテーマに馴染ませる */
+    .leaflet-control-attribution {
+      background: rgba(11, 15, 25, 0.75) !important;
+      color: #94a3b8 !important;
+      font-size: 9px !important;
+      padding: 1px 5px !important;
+    }
+    .leaflet-control-attribution a {
+      color: #38bdf8 !important;
+    }
+    /* ターゲット水利のパルスアニメーション */
+    @keyframes targetPulse {
+      0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.85); }
+      70% { transform: scale(1.05); box-shadow: 0 0 0 14px rgba(239, 68, 68, 0); }
+      100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+    .hydrant-pin-active {
+      animation: targetPulse 1.6s infinite;
+    }
+  </style>
+</head>
+<body class="flex flex-col h-dvh overflow-hidden bg-[#0b0f19]">
+
+  <!-- =====================================================================
+       1. 上部：測位ステータスバー＆表示モード切替タブ（地図 / レーダー / AR）
+  ====================================================================== -->
+  <header class="bg-[#151c2c] border-b border-slate-700/80 px-3 pt-2 pb-2 shrink-0 z-30 shadow-lg">
+    <div class="flex items-center justify-between gap-2">
+      <!-- GNSS精度バッジ -->
+      <div class="flex items-center gap-2">
+        <div id="accuracy-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900 border border-slate-700">
+          <span id="accuracy-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 animate-pulse"></span>
+          <span id="accuracy-label" class="text-[11px] font-bold text-slate-300">未測位</span>
+          <span id="accuracy-val" class="text-xs font-black tabular-nums text-white ml-0.5">-- m</span>
+        </div>
+      </div>
+
+      <!-- 右上コントロール：画面スリープ防止 & デモモード切替 -->
+      <div class="flex items-center gap-1.5">
+        <button id="btn-wakelock" type="button" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-bold text-slate-300 flex items-center gap-1 active:scale-95" title="画面消灯防止">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+          </svg>
+          <span id="wakelock-text">常時点灯OFF</span>
+        </button>
+
+        <button id="btn-demo-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-bold text-sky-400 flex items-center gap-1 active:scale-95">
+          <span>デモ: OFF</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- 現在地座標＆方位 -->
+    <div class="mt-1.5 flex items-center justify-between text-[11px] text-slate-400">
+      <div class="tabular-nums truncate">
+        現在地: <span id="current-coords" class="text-slate-200 font-semibold">取得待機中...</span>
+      </div>
+      <div class="tabular-nums shrink-0 ml-2">
+        方位: <span id="current-heading" class="text-sky-400 font-bold">--°</span>
+      </div>
+    </div>
+
+    <!-- 3モード切替タブ（地図 / レーダー / 簡易AR） -->
+    <div class="mt-2 grid grid-cols-3 gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+      <button id="tab-mode-map" type="button" class="py-2 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 bg-sky-500 text-slate-950 shadow transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+        </svg>
+        地図
+      </button>
+      <button id="tab-mode-radar" type="button" class="py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-900 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        レーダー
+      </button>
+      <button id="tab-mode-ar" type="button" class="py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-900 transition-colors">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path>
+        </svg>
+        簡易AR
+      </button>
+    </div>
+  </header>
+
+  <!-- =====================================================================
+       2. 中央ビューエリア（地図モード / 2Dレーダーモード / 簡易ARカメラモード）
+  ====================================================================== -->
+  <main class="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-[#0b0f19]">
+
+    <!-- 共通：ターゲット距離・方位の大型HUDバッジ（全モード共通で左上に固定表示） -->
+    <div class="absolute top-3 left-3 bg-slate-950/90 border border-slate-700/90 backdrop-blur-md px-3.5 py-2 rounded-2xl pointer-events-none shadow-xl z-20">
+      <div class="text-[10px] font-bold text-slate-400">ターゲットまで</div>
+      <div class="flex items-baseline gap-1">
+        <span id="target-distance" class="text-3xl sm:text-4xl font-black text-white tabular-nums tracking-tight">--</span>
+        <span class="text-sm font-bold text-slate-300">m</span>
+      </div>
+      <div class="text-xs font-bold text-sky-400 tabular-nums mt-0.5">
+        方位: <span id="target-bearing">--°</span> (<span id="target-rel-dir">--</span>)
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------------
+         [VIEW A] インタラクティブ地図モード (Leaflet.js + 国土地理院タイル)
+    -------------------------------------------------------------------- -->
+    <div id="view-map" class="relative w-full h-full z-10">
+      <div id="map-wrapper">
+        <div id="leaflet-map-rotator">
+          <div id="leaflet-map"></div>
+        </div>
+      </div>
+
+      <!-- オフライン／Leaflet未ロード時のフォールバック案内 -->
+      <div id="map-offline-fallback" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30">
+        <div class="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+          </svg>
+        </div>
+        <div class="text-base font-black text-white">地図ライブラリを読み込めませんでした</div>
+        <p class="text-xs text-slate-400 mt-1 max-w-xs">通信圏外またはオフライン環境の可能性があります。「レーダー」タブに切り替えると通信なしでも探索を継続できます。</p>
+        <button type="button" id="btn-fallback-to-radar" class="mt-4 px-5 py-3 rounded-xl bg-sky-500 text-slate-950 font-black text-sm">
+          レーダーモードへ切替
+        </button>
+      </div>
+
+      <!-- 地図モード用コントロール（右上：背景レイヤー切替・追従・ヘディングアップ） -->
+      <div class="absolute top-3 right-3 flex flex-col gap-2 z-20">
+        <!-- タイル切替（地理院標準 / 地理院航空写真 / OSM） -->
+        <button id="btn-map-layer" type="button" class="px-3 py-2.5 rounded-2xl bg-slate-950/90 border border-slate-600 text-xs font-bold text-white shadow-lg flex items-center justify-between gap-2 active:scale-95">
+          <span class="text-sky-400">地図:</span>
+          <span id="map-layer-label">地理院標準</span>
+        </button>
+
+        <!-- 現在地自動追従トグル -->
+        <button id="btn-map-follow" type="button" class="px-3 py-2.5 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center justify-between gap-2 active:scale-95">
+          <span>現在地追従</span>
+          <span id="map-follow-state" class="font-black">ON</span>
+        </button>
+
+        <!-- ヘディングアップ / ノースアップ切替 -->
+        <button id="btn-map-headingup" type="button" class="px-3 py-2.5 rounded-2xl bg-slate-950/90 border border-slate-600 text-xs font-bold text-slate-300 shadow-lg flex items-center justify-between gap-2 active:scale-95">
+          <span id="map-headingup-label">ノースアップ(北上)</span>
+        </button>
+      </div>
+
+      <!-- 地図右下：拡大縮小ボタン（手袋で押しやすい大型ボタン） -->
+      <div class="absolute bottom-3 right-3 flex flex-col gap-2 z-20">
+        <button id="btn-map-zoom-in" type="button" class="w-12 h-12 rounded-2xl bg-slate-950/90 border border-slate-600 text-xl font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
+        <button id="btn-map-zoom-out" type="button" class="w-12 h-12 rounded-2xl bg-slate-950/90 border border-slate-600 text-xl font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------------
+         [VIEW B] 2Dレーダーモード（オフライン完全対応）
+    -------------------------------------------------------------------- -->
+    <div id="view-radar" class="hidden relative w-full h-full flex items-center justify-center p-2 z-10">
+      <canvas id="radar-canvas" class="w-full h-full max-w-[440px] max-h-[440px]"></canvas>
+
+      <!-- レーダー右上：縮尺切替 -->
+      <div class="absolute top-3 right-3 flex flex-col gap-2 z-20">
+        <button id="btn-radar-scale" type="button" class="px-3.5 py-2.5 rounded-2xl bg-slate-900/95 border border-slate-600 text-xs font-bold text-slate-200 shadow-lg tabular-nums active:scale-95">
+          範囲: 50m
+        </button>
+      </div>
+
+      <!-- レーダー右下：凡例 -->
+      <div class="absolute bottom-2 right-3 bg-slate-900/85 px-2.5 py-1.5 rounded-xl border border-slate-800 text-[10px] text-slate-400 pointer-events-none flex items-center gap-3">
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-red-500 inline-block"></span>対象水利</span>
+        <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-sky-400/30 border border-sky-400 inline-block"></span>GNSS誤差円</span>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------------
+         [VIEW C] 簡易ARカメラモード
+    -------------------------------------------------------------------- -->
+    <div id="view-ar" class="hidden relative w-full h-full z-10">
+      <video id="ar-video" autoplay playsinline muted class="w-full h-full object-cover opacity-80"></video>
+      
+      <div class="absolute inset-0 pointer-events-none flex flex-col items-center justify-between p-4">
+        <div class="self-end bg-slate-950/85 border border-slate-700 px-3 py-1.5 rounded-full text-[11px] font-bold text-amber-400">
+          簡易ARカメラ（誤差 <span id="ar-err-badge">--m</span>）
+        </div>
+
+        <!-- AR方向インジケーター -->
+        <div class="relative flex items-center justify-center w-64 h-64">
+          <div id="ar-direction-ring" class="w-56 h-56 rounded-full border-2 border-dashed border-sky-400/70 flex items-center justify-center transition-transform duration-100">
+            <div class="flex flex-col items-center -mt-36">
+              <div class="bg-red-600 text-white font-black px-3 py-1 rounded-xl shadow-lg border-2 border-white text-sm whitespace-nowrap mb-1">
+                消火栓 <span id="ar-dist-badge">--m</span>
+              </div>
+              <svg class="w-12 h-12 text-red-500 drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)]" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 2L4.5 20.29l.71.71L12 18l6.79 3 .71-.71z"/>
+              </svg>
+            </div>
+          </div>
+          <!-- 画面中央クロスヘア -->
+          <div class="absolute w-6 h-6 border-2 border-white/80 rounded-full"></div>
+        </div>
+
+        <div class="h-4"></div>
+      </div>
+    </div>
+
+    <!-- -------------------------------------------------------------------
+         デモ移動操作パッド（デモモードON時のみ画面左下にフローティング表示）
+    -------------------------------------------------------------------- -->
+    <div id="demo-controls" class="hidden absolute bottom-3 left-3 z-30 bg-slate-950/95 border border-sky-500/60 p-2.5 rounded-2xl shadow-2xl">
+      <div class="text-[10px] font-bold text-sky-400 text-center mb-1.5">仮想移動・回転テスト</div>
+      <div class="grid grid-cols-3 gap-1 w-36">
+        <button type="button" data-demo="rotL" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-amber-300 active:bg-slate-700">↺左向</button>
+        <button type="button" data-demo="north" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-white active:bg-slate-700">↑北</button>
+        <button type="button" data-demo="rotR" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-amber-300 active:bg-slate-700">右向↻</button>
+        <button type="button" data-demo="west" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-white active:bg-slate-700">←西</button>
+        <button type="button" data-demo="err" class="p-2 bg-slate-800 rounded-lg text-[10px] font-bold text-slate-300 active:bg-slate-700">誤差切替</button>
+        <button type="button" data-demo="east" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-white active:bg-slate-700">東→</button>
+        <div></div>
+        <button type="button" data-demo="south" class="p-2 bg-slate-800 rounded-lg text-xs font-bold text-white active:bg-slate-700">↓南</button>
+        <div></div>
+      </div>
+    </div>
+  </main>
+
+  <!-- =====================================================================
+       3. 下部：基準点オフセットメモカード＆手袋対応大型フッターボタン
+  ====================================================================== -->
+  <footer class="bg-[#151c2c] border-t border-slate-700/80 px-3 pt-2.5 pb-3.5 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+    <!-- 選択中の水利情報＆基準点オフセットカード -->
+    <div class="bg-slate-900/95 border border-slate-700 rounded-2xl p-2.5 mb-2.5">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <div class="flex items-center gap-1.5 flex-wrap">
+            <span id="hydrant-type-badge" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-red-500/20 text-red-400 border border-red-500/40">
+              地下式消火栓
+            </span>
+            <span id="hydrant-cover-badge" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-slate-800 text-slate-300 border border-slate-600">
+              角蓋
+            </span>
+          </div>
+          <h1 id="hydrant-name" class="text-base sm:text-lg font-black text-white mt-1 truncate">
+            水利を選択してください
+          </h1>
+        </div>
+        <button id="btn-edit-current" type="button" class="px-3 py-1.5 rounded-xl bg-slate-800 border border-slate-600 text-xs font-bold text-slate-300 shrink-0 active:scale-95">
+          編集/補正
+        </button>
+      </div>
+
+      <!-- 最重要：基準点オフセットメモ（雪下の鉄蓋特定用） -->
+      <div class="mt-2 bg-amber-500/10 border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5">
+        <div class="text-[10px] font-bold text-amber-300 flex items-center gap-1">
+          <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+          </svg>
+          基準点オフセット（除雪目安）
+        </div>
+        <div id="hydrant-offset" class="text-sm font-black text-white mt-0.5 leading-snug">
+          --
+        </div>
+      </div>
+    </div>
+
+    <!-- 手袋対応・大型操作ボタン群（高さ56px以上） -->
+    <div class="grid grid-cols-3 gap-2">
+      <button id="btn-start-sensors" type="button" class="glove-btn bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm px-1.5 shadow-lg shadow-sky-500/20">
+        <svg class="w-4 h-4 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4"></path>
+        </svg>
+        <span id="sensor-btn-text">センサー開始</span>
+      </button>
+
+      <button id="btn-nearest" type="button" class="glove-btn bg-[#22c55e] hover:bg-green-400 text-slate-950 text-xs sm:text-sm px-1.5 shadow-lg shadow-green-500/20">
+        <svg class="w-4 h-4 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+        </svg>
+        最寄り選択
+      </button>
+
+      <button id="btn-open-list" type="button" class="glove-btn bg-slate-700 hover:bg-slate-600 text-white border border-slate-500 text-xs sm:text-sm px-1.5">
+        <svg class="w-4 h-4 mr-1 shrink-0 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+        </svg>
+        一覧 / 登録
+      </button>
+    </div>
+  </footer>
+
+  <!-- =====================================================================
+       モーダル1：水利一覧選択・新規登録アクセスモーダル
+  ====================================================================== -->
+  <div id="modal-list" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col p-3">
+    <div class="bg-[#151c2c] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[90vh] overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-700 flex items-center justify-between gap-2">
+        <h2 class="text-lg font-black text-white">水利一覧（距離順）</h2>
+        <div class="flex items-center gap-2">
+          <button id="btn-open-register-from-list" type="button" class="px-3.5 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
+            ＋ 新規登録/管理
+          </button>
+          <button type="button" data-close-modal="modal-list" class="px-3.5 py-2 rounded-xl bg-slate-800 text-xs font-bold text-slate-300">
+            閉じる
+          </button>
+        </div>
+      </div>
+      
+      <!-- 検索フィルター -->
+      <div class="p-3 border-b border-slate-800 bg-slate-900/50">
+        <input id="search-hydrant" type="text" placeholder="名称・住所・メモで検索..." class="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-base focus:outline-none focus:border-sky-400">
+      </div>
+
+      <!-- リスト本体 -->
+      <div id="hydrant-list-container" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+        <!-- JSで動的生成 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       モーダル2：水利の新規登録・編集・データ管理モーダル
+  ====================================================================== -->
+  <div id="modal-register" class="hidden fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-sm flex flex-col p-3 overflow-y-auto">
+    <div class="bg-[#151c2c] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto my-auto overflow-hidden shadow-2xl">
+      <div class="p-4 border-b border-slate-700 flex items-center justify-between">
+        <h2 id="register-modal-title" class="text-lg font-black text-white">水利登録・データ管理</h2>
+        <button type="button" data-close-modal="modal-register" class="px-4 py-2 rounded-xl bg-slate-800 text-sm font-bold text-slate-300">
+          閉じる
+        </button>
+      </div>
+
+      <div class="p-4 space-y-4 overflow-y-auto max-h-[80vh]">
+        <!-- 登録・編集フォーム -->
+        <form id="hydrant-form" class="space-y-3">
+          <input type="hidden" id="form-id">
+          
+          <div>
+            <label class="block text-xs font-bold text-slate-300 mb-1">水利名称（必須）</label>
+            <input id="form-name" type="text" required placeholder="例：中央町1丁目 地下式消火栓" class="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-base">
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">水利種別</label>
+              <select id="form-type" class="w-full px-3 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-base">
+                <option value="地下式消火栓">地下式消火栓</option>
+                <option value="地上式消火栓">地上式消火栓</option>
+                <option value="防火水槽">防火水槽</option>
+                <option value="自然水利">自然水利</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-300 mb-1">鉄蓋形状</label>
+              <select id="form-cover" class="w-full px-3 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-base">
+                <option value="角蓋">角蓋</option>
+                <option value="丸蓋">丸蓋</option>
+                <option value="双口・大型蓋">双口・大型蓋</option>
+                <option value="なし（地上）">なし（地上）</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- 座標入力＆現在地反映ボタン -->
+          <div class="bg-slate-900/80 border border-slate-700 p-3 rounded-xl space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-sky-400">座標（世界測地系 WGS84）</span>
+              <button id="btn-fill-current-gps" type="button" class="px-3 py-1.5 rounded-lg bg-sky-500/20 border border-sky-500/50 text-xs font-bold text-sky-300 active:scale-95">
+                現在地GPSを反映
+              </button>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] text-slate-400">緯度 (Lat)</label>
+                <input id="form-lat" type="number" step="any" required placeholder="37.948..." class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm tabular-nums">
+              </div>
+              <div>
+                <label class="block text-[11px] text-slate-400">経度 (Lon)</label>
+                <input id="form-lon" type="number" step="any" required placeholder="139.327..." class="w-full px-3 py-2 rounded-lg bg-slate-950 border border-slate-700 text-white text-sm tabular-nums">
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold text-amber-300 mb-1">基準点オフセットメモ（重要）</label>
+            <input id="form-offset" type="text" required placeholder="例：〇〇電柱から道路中心へ2.4m" class="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-slate-700 text-white text-base">
+          </div>
+
+          <div class="flex gap-2 pt-1">
+            <button type="submit" class="flex-1 glove-btn bg-[#22c55e] text-slate-950 text-base">
+              保存する
+            </button>
+            <button id="btn-delete-hydrant" type="button" class="hidden px-4 glove-btn bg-red-600/20 border border-red-500/50 text-red-400 text-sm">
+              削除
+            </button>
+          </div>
+        </form>
+
+        <!-- データバックアップ・インポート領域 -->
+        <div class="border-t border-slate-700 pt-4 space-y-2.5">
+          <div class="text-xs font-bold text-slate-400">データ管理（JSONバックアップ / 復元）</div>
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btn-export-json" type="button" class="py-3 px-3 rounded-xl bg-slate-800 border border-slate-600 text-xs font-bold text-white active:scale-95">
+              JSON出力 / コピー
+            </button>
+            <label class="py-3 px-3 rounded-xl bg-slate-800 border border-slate-600 text-xs font-bold text-sky-400 text-center cursor-pointer active:scale-95">
+              JSONファイル読込
+              <input id="input-import-json" type="file" accept=".json,application/json" class="hidden">
+            </label>
+          </div>
+          <button id="btn-reset-sample" type="button" class="w-full py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-bold text-slate-400 hover:text-red-400">
+            初期サンプルデータ（新発田市周辺）に戻す
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- カスタムトースト通知 -->
+  <div id="toast-container" class="fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-[90%] max-w-sm"></div>
+
+  <!-- =====================================================================
+       アプリケーションロジック (Vanilla JS + Leaflet.js)
+  ====================================================================== -->
+  <script>
+    /**
+     * 積雪期 水利・消火栓探索支援ツール (Leaflet.js 地図統合版)
+     * - 地図モード（国土地理院標準・航空写真・OSM / GNSS誤差円 / ヘディングアップ対応）
+     * - 2Dレーダーモード（完全オフライン動作）
+     * - 簡易ARカメラモード
+     */
+
+    // =========================================================================
+    // 1. 初期サンプルデータ（新潟県新発田市周辺の模擬水利データ）
+    // =========================================================================
+    const DEFAULT_HYDRANTS = [
+      {
+        id: 'hyd-001',
+        name: '中央町1丁目 地下式消火栓',
+        type: '地下式消火栓',
+        cover: '角蓋',
+        lat: 37.948250,
+        lon: 139.327410,
+        offset: '消火栓標識ポール真下から車道側へ1.8m（白線内側）'
+      },
+      {
+        id: 'hyd-002',
+        name: '大手町交差点北側 地下式消火栓',
+        type: '地下式消火栓',
+        cover: '丸蓋',
+        lat: 37.949820,
+        lon: 139.326150,
+        offset: '北東角の電柱（NTT柱）から南西へ2.4m・歩道縁石際'
+      },
+      {
+        id: 'hyd-003',
+        name: '本町2丁目商店街 地下式消火栓',
+        type: '地下式消火栓',
+        cover: '角蓋',
+        lat: 37.946910,
+        lon: 139.329120,
+        offset: 'アーケード柱No.14の正面・道路中心寄り1.5m'
+      },
+      {
+        id: 'hyd-004',
+        name: '諏訪町公園前 防火水槽（40t）',
+        type: '防火水槽',
+        cover: '丸蓋',
+        lat: 37.945400,
+        lon: 139.325800,
+        offset: '公園入口の車止めポールから北へ3.0m（吸管投入孔）'
+      },
+      {
+        id: 'hyd-005',
+        name: '新発田駅西口ロータリー 地下式消火栓',
+        type: '地下式消火栓',
+        cover: '双口・大型蓋',
+        lat: 37.947600,
+        lon: 139.335200,
+        offset: 'タクシー乗り場上屋支柱から西へ2.2m'
+      }
+    ];
+
+    const STORAGE_KEY = 'snow_hydrant_finder_data_v1';
+
+    // =========================================================================
+    // 2. アプリケーション状態管理
+    // =========================================================================
+    const state = {
+      hydrants: [],
+      selectedId: null,
+      // 表示モード: 'map' | 'radar' | 'ar'
+      viewMode: 'map',
+      // 現在地情報
+      userPos: {
+        lat: null,
+        lon: null,
+        accuracy: null,
+        timestamp: null
+      },
+      // 端末の方位角（真北基準 0〜360度、時計回り）
+      heading: 0,
+      hasCompass: false,
+      // レーダー表示半径（メートル）
+      radarScales: [30, 50, 100, 250],
+      radarScaleIdx: 1,
+      // 地図モード状態
+      mapTileKeys: ['gsi_std', 'gsi_photo', 'osm'],
+      mapTileIdx: 0,
+      mapAutoFollow: true,
+      mapHeadingUp: false,
+      // その他モード
+      isDemoMode: false,
+      wakeLock: null,
+      watchId: null,
+      arStream: null
+    };
+
+    // Leaflet関連オブジェクト保持用
+    const mapCtx = {
+      map: null,
+      tileLayers: {},
+      currentTileLayer: null,
+      hydrantMarkers: {},
+      userMarker: null,
+      accuracyCircle: null,
+      targetLine: null,
+      isReady: false
+    };
+
+    // =========================================================================
+    // 3. DOM要素のキャッシュ
+    // =========================================================================
+    const dom = {
+      accuracyDot: document.getElementById('accuracy-dot'),
+      accuracyLabel: document.getElementById('accuracy-label'),
+      accuracyVal: document.getElementById('accuracy-val'),
+      currentCoords: document.getElementById('current-coords'),
+      currentHeading: document.getElementById('current-heading'),
+      btnWakeLock: document.getElementById('btn-wakelock'),
+      wakeLockText: document.getElementById('wakelock-text'),
+      btnDemoToggle: document.getElementById('btn-demo-toggle'),
+      demoControls: document.getElementById('demo-controls'),
+      // モード切替タブ & ビューコンテナ
+      tabModeMap: document.getElementById('tab-mode-map'),
+      tabModeRadar: document.getElementById('tab-mode-radar'),
+      tabModeAr: document.getElementById('tab-mode-ar'),
+      viewMap: document.getElementById('view-map'),
+      viewRadar: document.getElementById('view-radar'),
+      viewAr: document.getElementById('view-ar'),
+      // 地図モード要素
+      leafletMapRotator: document.getElementById('leaflet-map-rotator'),
+      mapOfflineFallback: document.getElementById('map-offline-fallback'),
+      btnFallbackToRadar: document.getElementById('btn-fallback-to-radar'),
+      btnMapLayer: document.getElementById('btn-map-layer'),
+      mapLayerLabel: document.getElementById('map-layer-label'),
+      btnMapFollow: document.getElementById('btn-map-follow'),
+      mapFollowState: document.getElementById('map-follow-state'),
+      btnMapHeadingUp: document.getElementById('btn-map-headingup'),
+      mapHeadingUpLabel: document.getElementById('map-headingup-label'),
+      btnMapZoomIn: document.getElementById('btn-map-zoom-in'),
+      btnMapZoomOut: document.getElementById('btn-map-zoom-out'),
+      // レーダー・AR・共通HUD
+      radarCanvas: document.getElementById('radar-canvas'),
+      targetDistance: document.getElementById('target-distance'),
+      targetBearing: document.getElementById('target-bearing'),
+      targetRelDir: document.getElementById('target-rel-dir'),
+      btnRadarScale: document.getElementById('btn-radar-scale'),
+      arVideo: document.getElementById('ar-video'),
+      arDirectionRing: document.getElementById('ar-direction-ring'),
+      arDistBadge: document.getElementById('ar-dist-badge'),
+      arErrBadge: document.getElementById('ar-err-badge'),
+      // 下部情報パネル
+      hydrantTypeBadge: document.getElementById('hydrant-type-badge'),
+      hydrantCoverBadge: document.getElementById('hydrant-cover-badge'),
+      hydrantName: document.getElementById('hydrant-name'),
+      hydrantOffset: document.getElementById('hydrant-offset'),
+      // フッターボタン・モーダル
+      btnStartSensors: document.getElementById('btn-start-sensors'),
+      sensorBtnText: document.getElementById('sensor-btn-text'),
+      btnNearest: document.getElementById('btn-nearest'),
+      btnOpenList: document.getElementById('btn-open-list'),
+      btnOpenRegisterFromList: document.getElementById('btn-open-register-from-list'),
+      btnEditCurrent: document.getElementById('btn-edit-current'),
+      modalList: document.getElementById('modal-list'),
+      searchHydrant: document.getElementById('search-hydrant'),
+      hydrantListContainer: document.getElementById('hydrant-list-container'),
+      modalRegister: document.getElementById('modal-register'),
+      registerModalTitle: document.getElementById('register-modal-title'),
+      hydrantForm: document.getElementById('hydrant-form'),
+      formId: document.getElementById('form-id'),
+      formName: document.getElementById('form-name'),
+      formType: document.getElementById('form-type'),
+      formCover: document.getElementById('form-cover'),
+      formLat: document.getElementById('form-lat'),
+      formLon: document.getElementById('form-lon'),
+      formOffset: document.getElementById('form-offset'),
+      btnFillCurrentGps: document.getElementById('btn-fill-current-gps'),
+      btnDeleteHydrant: document.getElementById('btn-delete-hydrant'),
+      btnExportJson: document.getElementById('btn-export-json'),
+      inputImportJson: document.getElementById('input-import-json'),
+      btnResetSample: document.getElementById('btn-reset-sample'),
+      toastContainer: document.getElementById('toast-container')
+    };
+
+    // =========================================================================
+    // 4. 測地計算ユーティリティ（距離・方位角）
+    // =========================================================================
+    const GeoUtils = {
+      toRad: (deg) => (deg * Math.PI) / 180,
+      toDeg: (rad) => (rad * 180) / Math.PI,
+
+      calcDistance(lat1, lon1, lat2, lon2) {
+        const R = 6378137.0;
+        const dLat = this.toRad(lat2 - lat1);
+        const dLon = this.toRad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(this.toRad(lat1)) *
+            Math.cos(this.toRad(lat2)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      },
+
+      calcBearing(lat1, lon1, lat2, lon2) {
+        const phi1 = this.toRad(lat1);
+        const phi2 = this.toRad(lat2);
+        const dLambda = this.toRad(lon2 - lon1);
+        const y = Math.sin(dLambda) * Math.cos(phi2);
+        const x =
+          Math.cos(phi1) * Math.sin(phi2) -
+          Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+        const brng = this.toDeg(Math.atan2(y, x));
+        return (brng + 360) % 360;
+      },
+
+      getRelativeDirectionLabel(relAngle) {
+        const norm = ((relAngle + 540) % 360) - 180;
+        const abs = Math.abs(norm);
+        if (abs <= 15) return '正面';
+        if (abs <= 60) return norm > 0 ? '右斜め前' : '左斜め前';
+        if (abs <= 120) return norm > 0 ? '真横（右）' : '真横（左）';
+        if (abs <= 165) return norm > 0 ? '右後方' : '左後方';
+        return '真後ろ';
+      }
+    };
+
+    // =========================================================================
+    // 5. 通知（トースト）表示
+    // =========================================================================
+    function showToast(message, type = 'info') {
+      const el = document.createElement('div');
+      const colors = {
+        info: 'bg-slate-900 border-sky-400 text-white',
+        success: 'bg-emerald-950 border-emerald-400 text-emerald-100',
+        warn: 'bg-amber-950 border-amber-400 text-amber-100',
+        error: 'bg-red-950 border-red-400 text-red-100'
+      };
+      el.className = `px-4 py-2.5 rounded-2xl border-2 text-xs sm:text-sm font-bold shadow-2xl transition-all duration-300 ${colors[type] || colors.info}`;
+      el.textContent = message;
+      dom.toastContainer.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateY(-10px)';
+        setTimeout(() => el.remove(), 300);
+      }, 2800);
+    }
+
+    // =========================================================================
+    // 6. データ永続化（LocalStorage）
+    // =========================================================================
+    function loadHydrants() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            state.hydrants = parsed;
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('LocalStorage読み込みエラー:', e);
+      }
+      state.hydrants = JSON.parse(JSON.stringify(DEFAULT_HYDRANTS));
+      saveHydrants();
+    }
+
+    function saveHydrants() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state.hydrants));
+      } catch (e) {
+        showToast('端末へのデータ保存に失敗しました', 'error');
+      }
+    }
+
+    function getSelectedHydrant() {
+      return state.hydrants.find((h) => h.id === state.selectedId) || state.hydrants[0] || null;
+    }
+
+    // =========================================================================
+    // 7. Leaflet.js インタラクティブ地図の初期化と更新
+    // =========================================================================
+    function initLeafletMap() {
+      if (typeof L === 'undefined') {
+        // オフライン等でLeaflet CDNが読み込めなかった場合
+        dom.mapOfflineFallback.classList.remove('hidden');
+        return;
+      }
+
+      const initialHydrant = getSelectedHydrant() || DEFAULT_HYDRANTS[0];
+
+      // タイルレイヤー定義（国土地理院 標準地図 / 航空写真 / OpenStreetMap）
+      mapCtx.tileLayers = {
+        gsi_std: {
+          name: '地理院標準',
+          layer: L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/std/{z}/{x}/{y}.png', {
+            attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>',
+            maxZoom: 18
+          })
+        },
+        gsi_photo: {
+          name: '航空写真',
+          layer: L.tileLayer('https://cyberjapandata.gsi.go.jp/xyz/seamlessphoto/{z}/{x}/{y}.jpg', {
+            attribution: '<a href="https://maps.gsi.go.jp/development/ichiran.html" target="_blank">国土地理院</a>',
+            maxZoom: 18
+          })
+        },
+        osm: {
+          name: 'OSM地図',
+          layer: L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors',
+            maxZoom: 19
+          })
+        }
+      };
+
+      // マップ初期化（ズームコントロールは自作大型ボタンを使うため無効化）
+      mapCtx.map = L.map('leaflet-map', {
+        center: [initialHydrant.lat, initialHydrant.lon],
+        zoom: 17,
+        zoomControl: false,
+        attributionControl: true
+      });
+
+      // デフォルトレイヤー追加
+      const defaultKey = state.mapTileKeys[state.mapTileIdx];
+      mapCtx.currentTileLayer = mapCtx.tileLayers[defaultKey].layer;
+      mapCtx.currentTileLayer.addTo(mapCtx.map);
+
+      // ユーザーが手動で地図をドラッグしたら自動追従を一時解除
+      mapCtx.map.on('dragstart', () => {
+        if (state.mapAutoFollow) {
+          setMapAutoFollow(false, true);
+        }
+      });
+
+      // ターゲット誘導線（破線）
+      mapCtx.targetLine = L.polyline([], {
+        color: '#ef4444',
+        weight: 4,
+        opacity: 0.85,
+        dashArray: '8, 8'
+      }).addTo(mapCtx.map);
+
+      mapCtx.isReady = true;
+      syncMapMarkers();
+    }
+
+    /**
+     * 地図上の水利マーカー・現在地マーカー・GNSS誤差円・誘導線を最新状態に同期
+     */
+    function syncMapMarkers() {
+      if (!mapCtx.isReady || !mapCtx.map) return;
+
+      const target = getSelectedHydrant();
+
+      // 1. 全水利ピンの再構築・更新
+      const activeIds = new Set(state.hydrants.map((h) => h.id));
+      Object.keys(mapCtx.hydrantMarkers).forEach((id) => {
+        if (!activeIds.has(id)) {
+          mapCtx.map.removeLayer(mapCtx.hydrantMarkers[id]);
+          delete mapCtx.hydrantMarkers[id];
+        }
+      });
+
+      state.hydrants.forEach((h) => {
+        const isSelected = target && h.id === target.id;
+        const iconHtml = isSelected
+          ? `<div class="hydrant-pin-active flex items-center justify-center w-9 h-9 rounded-full bg-red-600 border-2 border-white shadow-lg text-white font-black text-xs">消</div>`
+          : `<div class="flex items-center justify-center w-7 h-7 rounded-full bg-sky-600/90 border-2 border-white shadow text-white font-bold text-[10px]">水</div>`;
+
+        const customIcon = L.divIcon({
+          html: iconHtml,
+          className: '',
+          iconSize: isSelected ? [36, 36] : [28, 28],
+          iconAnchor: isSelected ? [18, 18] : [14, 14]
+        });
+
+        if (mapCtx.hydrantMarkers[h.id]) {
+          mapCtx.hydrantMarkers[h.id].setLatLng([h.lat, h.lon]);
+          mapCtx.hydrantMarkers[h.id].setIcon(customIcon);
+          mapCtx.hydrantMarkers[h.id].setZIndexOffset(isSelected ? 1000 : 100);
+        } else {
+          const marker = L.marker([h.lat, h.lon], {
+            icon: customIcon,
+            zIndexOffset: isSelected ? 1000 : 100
+          }).addTo(mapCtx.map);
+
+          marker.on('click', () => {
+            state.selectedId = h.id;
+            updateUI();
+            showToast(`選択: ${h.name}`, 'info');
+          });
+          mapCtx.hydrantMarkers[h.id] = marker;
+        }
+      });
+
+      // 2. 現在地マーカー（進行方向コーン付き）と GNSS誤差円（L.circle）
+      if (state.userPos.lat !== null && state.userPos.lon !== null) {
+        const userLatLng = [state.userPos.lat, state.userPos.lon];
+        const acc = state.userPos.accuracy || 5;
+
+        // 誤差半径円（メートル単位の実寸表示）
+        if (!mapCtx.accuracyCircle) {
+          mapCtx.accuracyCircle = L.circle(userLatLng, {
+            radius: acc,
+            color: '#38bdf8',
+            weight: 1.5,
+            dashArray: '4, 4',
+            fillColor: '#38bdf8',
+            fillOpacity: 0.18
+          }).addTo(mapCtx.map);
+        } else {
+          mapCtx.accuracyCircle.setLatLng(userLatLng);
+          mapCtx.accuracyCircle.setRadius(acc);
+        }
+
+        // 現在地＆方位コーンアイコン
+        const userIconHtml = `
+          <div style="transform: rotate(${state.heading}deg); width: 44px; height: 44px; display: flex; align-items: center; justify-content: center;">
+            <svg width="44" height="44" viewBox="0 0 44 44">
+              <path d="M22 2 L35 24 L22 19 L9 24 Z" fill="rgba(56, 189, 248, 0.55)" />
+              <circle cx="22" cy="22" r="7" fill="#0284c7" stroke="#ffffff" stroke-width="2.5" />
+            </svg>
+          </div>
+        `;
+        const userIcon = L.divIcon({
+          html: userIconHtml,
+          className: '',
+          iconSize: [44, 44],
+          iconAnchor: [22, 22]
+        });
+
+        if (!mapCtx.userMarker) {
+          mapCtx.userMarker = L.marker(userLatLng, {
+            icon: userIcon,
+            zIndexOffset: 2000
+          }).addTo(mapCtx.map);
+        } else {
+          mapCtx.userMarker.setLatLng(userLatLng);
+          mapCtx.userMarker.setIcon(userIcon);
+        }
+
+        // ターゲットへの誘導線
+        if (target) {
+          mapCtx.targetLine.setLatLngs([userLatLng, [target.lat, target.lon]]);
+        }
+
+        // 自動追従がONなら現在地を画面中央に維持
+        if (state.mapAutoFollow) {
+          mapCtx.map.setView(userLatLng, mapCtx.map.getZoom(), { animate: true });
+        }
+      } else if (target && state.mapAutoFollow) {
+        // GPS未測位時は選択中の水利を中心に表示
+        mapCtx.map.setView([target.lat, target.lon], mapCtx.map.getZoom(), { animate: false });
+      }
+
+      // 3. ヘディングアップ回転制御（自分の向いている方向を上にする）
+      if (state.mapHeadingUp) {
+        dom.leafletMapRotator.style.transform = `rotate(${-state.heading}deg)`;
+      } else {
+        dom.leafletMapRotator.style.transform = 'rotate(0deg)';
+      }
+    }
+
+    function setMapAutoFollow(enabled, silent = false) {
+      state.mapAutoFollow = enabled;
+      if (enabled) {
+        dom.mapFollowState.textContent = 'ON';
+        dom.btnMapFollow.className = 'px-3 py-2.5 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center justify-between gap-2 active:scale-95';
+        syncMapMarkers();
+        if (!silent) showToast('現在地自動追従をONにしました', 'info');
+      } else {
+        dom.mapFollowState.textContent = 'OFF';
+        dom.btnMapFollow.className = 'px-3 py-2.5 rounded-2xl bg-slate-950/90 border border-slate-600 text-xs font-bold text-slate-400 shadow-lg flex items-center justify-between gap-2 active:scale-95';
+        if (!silent) showToast('地図を自由にスクロールできます', 'info');
+      }
+    }
+
+    // =========================================================================
+    // 8. 3モード切替（地図 / レーダー / 簡易AR）
+    // =========================================================================
+    async function switchViewMode(mode) {
+      if (state.viewMode === mode) return;
+
+      // 既存のARカメラストリームがあれば停止
+      if (state.viewMode === 'ar' && state.arStream) {
+        state.arStream.getTracks().forEach((t) => t.stop());
+        state.arStream = null;
+        dom.arVideo.srcObject = null;
+      }
+
+      // ARモードへ切り替える場合はカメラ起動を試行
+      if (mode === 'ar') {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showToast('このブラウザはカメラ起動に対応していません', 'error');
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } },
+            audio: false
+          });
+          state.arStream = stream;
+          dom.arVideo.srcObject = stream;
+          showToast('簡易ARカメラを起動しました', 'warn');
+        } catch (err) {
+          showToast('カメラの起動が許可されませんでした', 'error');
+          return;
+        }
+      }
+
+      state.viewMode = mode;
+
+      // タブのアクティブスタイル更新
+      const tabs = {
+        map: dom.tabModeMap,
+        radar: dom.tabModeRadar,
+        ar: dom.tabModeAr
+      };
+      Object.entries(tabs).forEach(([key, el]) => {
+        if (key === mode) {
+          el.className = 'py-2 rounded-lg text-xs sm:text-sm font-black flex items-center justify-center gap-1.5 bg-sky-500 text-slate-950 shadow transition-colors';
+        } else {
+          el.className = 'py-2 rounded-lg text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 text-slate-300 hover:bg-slate-900 transition-colors';
+        }
+      });
+
+      // コンテナ表示切替
+      dom.viewMap.classList.toggle('hidden', mode !== 'map');
+      dom.viewRadar.classList.toggle('hidden', mode !== 'radar');
+      dom.viewAr.classList.toggle('hidden', mode !== 'ar');
+
+      if (mode === 'map' && mapCtx.isReady && mapCtx.map) {
+        setTimeout(() => {
+          mapCtx.map.invalidateSize();
+          syncMapMarkers();
+        }, 50);
+      } else if (mode === 'radar') {
+        drawRadar();
+      }
+      updateUI();
+    }
+
+    // =========================================================================
+    // 9. GPS測位 & 電子コンパス制御
+    // =========================================================================
+    async function startSensors() {
+      // iOS Safari 13+ 向け DeviceOrientation 許可要求
+      if (
+        typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function'
+      ) {
+        try {
+          const response = await DeviceOrientationEvent.requestPermission();
+          if (response === 'granted') {
+            initCompassListeners();
+          } else {
+            showToast('コンパスの許可が拒否されました', 'warn');
+          }
+        } catch (err) {
+          console.warn('Compass permission error:', err);
+        }
+      } else {
+        initCompassListeners();
+      }
+
+      if (!('geolocation' in navigator)) {
+        showToast('この端末はGPS測位に対応していません', 'error');
+        return;
+      }
+
+      if (state.watchId !== null) {
+        navigator.geolocation.clearWatch(state.watchId);
+      }
+
+      dom.sensorBtnText.textContent = '測位稼働中';
+      dom.btnStartSensors.classList.remove('bg-sky-500', 'text-slate-950');
+      dom.btnStartSensors.classList.add('bg-sky-950', 'border', 'border-sky-400', 'text-sky-300');
+      showToast('GPS測位とコンパスを開始しました', 'success');
+
+      state.watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (state.isDemoMode) return;
+          state.userPos = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            timestamp: pos.timestamp
+          };
+          updateUI();
+        },
+        (err) => {
+          let msg = 'GPS測位エラー';
+          if (err.code === 1) msg = '位置情報の利用が許可されていません';
+          if (err.code === 2) msg = '現在地を取得できません（屋内など）';
+          if (err.code === 3) msg = 'GPS測位がタイムアウトしました';
+          showToast(`${msg}。デモモードでも試せます`, 'warn');
+        },
+        {
+          enableHighAccuracy: true,
+          maximumAge: 1000,
+          timeout: 10000
+        }
+      );
+    }
+
+    function initCompassListeners() {
+      window.addEventListener('deviceorientationabsolute', handleOrientation, true);
+      window.addEventListener('deviceorientation', handleOrientation, true);
+    }
+
+    function handleOrientation(event) {
+      if (state.isDemoMode) return;
+
+      let heading = null;
+      if (typeof event.webkitCompassHeading === 'number') {
+        heading = event.webkitCompassHeading;
+      } else if (event.absolute === true && typeof event.alpha === 'number') {
+        heading = (360 - event.alpha) % 360;
+      } else if (typeof event.alpha === 'number' && !state.hasCompass) {
+        heading = (360 - event.alpha) % 360;
+      }
+
+      if (heading !== null && !isNaN(heading)) {
+        state.hasCompass = true;
+        const diff = ((heading - state.heading + 540) % 360) - 180;
+        state.heading = (state.heading + diff * 0.25 + 360) % 360;
+        updateUI();
+      }
+    }
+
+    // =========================================================================
+    // 10. 最寄り水利の自動検索
+    // =========================================================================
+    function selectNearestHydrant(silent = false) {
+      if (state.hydrants.length === 0) return;
+
+      if (state.userPos.lat === null) {
+        state.selectedId = state.hydrants[0].id;
+        updateUI();
+        if (!silent) showToast('現在地未取得のため先頭の水利を選択しました', 'info');
+        return;
+      }
+
+      let nearest = null;
+      let minDist = Infinity;
+
+      state.hydrants.forEach((h) => {
+        const d = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, h.lat, h.lon);
+        if (d < minDist) {
+          minDist = d;
+          nearest = h;
+        }
+      });
+
+      if (nearest) {
+        state.selectedId = nearest.id;
+        updateUI();
+        if (!silent) {
+          showToast(`最寄り選択: ${nearest.name} (${minDist.toFixed(0)}m)`, 'success');
+        }
+      }
+    }
+
+    // =========================================================================
+    // 11. 2Dレーダー描画ロジック（Canvas）
+    // =========================================================================
+    function drawRadar() {
+      const canvas = dom.radarCanvas;
+      const rect = canvas.getBoundingClientRect();
+      if (rect.width === 0 || rect.height === 0) return;
+
+      const dpr = window.devicePixelRatio || 1;
+      if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+        canvas.width = rect.width * dpr;
+        canvas.height = rect.height * dpr;
+      }
+
+      const ctx = canvas.getContext('2d');
+      ctx.save();
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const maxRadius = Math.min(cx, cy) - 24;
+      const maxMeters = state.radarScales[state.radarScaleIdx];
+
+      ctx.clearRect(0, 0, w, h);
+
+      // レーダー盤面ベース
+      ctx.beginPath();
+      ctx.arc(cx, cy, maxRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#080c14';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#334155';
+      ctx.stroke();
+
+      // 同心円グリッド
+      [0.33, 0.66, 1.0].forEach((ratio, idx) => {
+        const r = maxRadius * ratio;
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI * 2);
+        ctx.lineWidth = idx === 2 ? 2 : 1;
+        ctx.strokeStyle = idx === 2 ? '#475569' : '#1e293b';
+        ctx.stroke();
+
+        const distLabel = Math.round(maxMeters * ratio) + 'm';
+        ctx.fillStyle = '#64748b';
+        ctx.font = 'bold 11px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(distLabel, cx, cy - r + 13);
+      });
+
+      // 十字線
+      ctx.strokeStyle = '#1e293b';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(cx - maxRadius, cy);
+      ctx.lineTo(cx + maxRadius, cy);
+      ctx.moveTo(cx, cy - maxRadius);
+      ctx.lineTo(cx, cy + maxRadius);
+      ctx.stroke();
+
+      // 東西南北（N/E/S/W）
+      const dirs = [
+        { label: 'N', angle: 0, color: '#ef4444' },
+        { label: 'E', angle: 90, color: '#94a3b8' },
+        { label: 'S', angle: 180, color: '#94a3b8' },
+        { label: 'W', angle: 270, color: '#94a3b8' }
+      ];
+      dirs.forEach((d) => {
+        const relRad = GeoUtils.toRad(d.angle - state.heading - 90);
+        const tx = cx + Math.cos(relRad) * (maxRadius + 13);
+        const ty = cy + Math.sin(relRad) * (maxRadius + 13);
+        ctx.fillStyle = d.color;
+        ctx.font = '900 13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(d.label, tx, ty);
+      });
+
+      // 正面（進行方向）三角ガイド
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - maxRadius - 2);
+      ctx.lineTo(cx - 7, cy - maxRadius + 10);
+      ctx.lineTo(cx + 7, cy - maxRadius + 10);
+      ctx.closePath();
+      ctx.fillStyle = '#38bdf8';
+      ctx.fill();
+
+      // GNSS誤差円
+      if (state.userPos.accuracy !== null) {
+        const accPx = Math.min(maxRadius, (state.userPos.accuracy / maxMeters) * maxRadius);
+        ctx.beginPath();
+        ctx.arc(cx, cy, Math.max(8, accPx), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(56, 189, 248, 0.15)';
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = 'rgba(56, 189, 248, 0.7)';
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // 水利プロット
+      const target = getSelectedHydrant();
+      if (state.userPos.lat !== null && target) {
+        state.hydrants.forEach((h) => {
+          if (h.id === target.id) return;
+          const dist = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, h.lat, h.lon);
+          if (dist <= maxMeters) {
+            const brng = GeoUtils.calcBearing(state.userPos.lat, state.userPos.lon, h.lat, h.lon);
+            const relRad = GeoUtils.toRad(brng - state.heading - 90);
+            const rPx = (dist / maxMeters) * maxRadius;
+            const px = cx + Math.cos(relRad) * rPx;
+            const py = cy + Math.sin(relRad) * rPx;
+
+            ctx.beginPath();
+            ctx.arc(px, py, 5, 0, Math.PI * 2);
+            ctx.fillStyle = '#64748b';
+            ctx.fill();
+          }
+        });
+
+        const dist = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, target.lat, target.lon);
+        const brng = GeoUtils.calcBearing(state.userPos.lat, state.userPos.lon, target.lat, target.lon);
+        const relAngle = (brng - state.heading + 360) % 360;
+        const relRad = GeoUtils.toRad(relAngle - 90);
+
+        const isOutOfRange = dist > maxMeters;
+        const rPx = isOutOfRange ? maxRadius - 6 : (dist / maxMeters) * maxRadius;
+        const tx = cx + Math.cos(relRad) * rPx;
+        const ty = cy + Math.sin(relRad) * rPx;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(tx, ty);
+        ctx.lineWidth = 3;
+        ctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+        ctx.stroke();
+
+        ctx.save();
+        ctx.translate(tx, ty);
+        ctx.rotate(GeoUtils.toRad(relAngle));
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 16, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(0, -14);
+        ctx.lineTo(11, 10);
+        ctx.lineTo(0, 5);
+        ctx.lineTo(-11, 10);
+        ctx.closePath();
+        ctx.fillStyle = '#ef4444';
+        ctx.fill();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = '#ffffff';
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // 中心点
+      ctx.beginPath();
+      ctx.arc(cx, cy, 7, 0, Math.PI * 2);
+      ctx.fillStyle = '#38bdf8';
+      ctx.fill();
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // =========================================================================
+    // 12. UI全体の更新処理
+    // =========================================================================
+    function updateUI() {
+      // 1. 測位精度ステータス更新
+      const acc = state.userPos.accuracy;
+      if (acc !== null) {
+        dom.accuracyVal.textContent = `±${acc.toFixed(1)}m`;
+        dom.arErrBadge.textContent = `±${acc.toFixed(1)}m`;
+        if (acc <= 3.0) {
+          dom.accuracyDot.className = 'w-2.5 h-2.5 rounded-full bg-[#22c55e]';
+          dom.accuracyLabel.textContent = '高精度';
+          dom.accuracyLabel.className = 'text-[11px] font-black text-[#22c55e]';
+        } else if (acc <= 8.0) {
+          dom.accuracyDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+          dom.accuracyLabel.textContent = '標準';
+          dom.accuracyLabel.className = 'text-[11px] font-black text-amber-400';
+        } else {
+          dom.accuracyDot.className = 'w-2.5 h-2.5 rounded-full bg-[#ef4444] animate-ping';
+          dom.accuracyLabel.textContent = '誤差大';
+          dom.accuracyLabel.className = 'text-[11px] font-black text-[#ef4444]';
+        }
+        dom.currentCoords.textContent = `${state.userPos.lat.toFixed(6)}, ${state.userPos.lon.toFixed(6)}`;
+      }
+
+      dom.currentHeading.textContent = `${Math.round(state.heading)}°`;
+
+      // 2. 選択中の水利情報更新
+      const target = getSelectedHydrant();
+      if (target) {
+        dom.hydrantName.textContent = target.name;
+        dom.hydrantTypeBadge.textContent = target.type;
+        dom.hydrantCoverBadge.textContent = target.cover;
+        dom.hydrantOffset.textContent = target.offset;
+
+        if (state.userPos.lat !== null) {
+          const dist = GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, target.lat, target.lon);
+          const brng = GeoUtils.calcBearing(state.userPos.lat, state.userPos.lon, target.lat, target.lon);
+          const relAngle = (brng - state.heading + 360) % 360;
+
+          const distStr = dist < 100 ? dist.toFixed(1) : Math.round(dist).toString();
+          dom.targetDistance.textContent = distStr;
+          dom.targetBearing.textContent = `${Math.round(brng)}°`;
+          dom.targetRelDir.textContent = GeoUtils.getRelativeDirectionLabel(relAngle);
+
+          // ARオーバーレイ連動
+          dom.arDistBadge.textContent = `${distStr}m`;
+          dom.arDirectionRing.style.transform = `rotate(${relAngle}deg)`;
+        } else {
+          dom.targetDistance.textContent = '--';
+          dom.targetBearing.textContent = '--°';
+          dom.targetRelDir.textContent = '測位待ち';
+        }
+      }
+
+      // 3. アクティブなビューの更新
+      if (state.viewMode === 'map') {
+        syncMapMarkers();
+      } else if (state.viewMode === 'radar') {
+        drawRadar();
+      }
+    }
+
+    // =========================================================================
+    // 13. 画面スリープ防止（Screen Wake Lock API）
+    // =========================================================================
+    async function toggleWakeLock() {
+      if (!('wakeLock' in navigator)) {
+        showToast('この端末は画面常時点灯APIに非対応です', 'warn');
+        return;
+      }
+
+      if (state.wakeLock !== null) {
+        await state.wakeLock.release();
+        state.wakeLock = null;
+        dom.wakeLockText.textContent = '常時点灯OFF';
+        dom.btnWakeLock.classList.remove('border-amber-400', 'text-amber-300');
+        showToast('画面の自動消灯防止を解除しました', 'info');
+      } else {
+        try {
+          state.wakeLock = await navigator.wakeLock.request('screen');
+          dom.wakeLockText.textContent = '常時点灯ON';
+          dom.btnWakeLock.classList.add('border-amber-400', 'text-amber-300');
+          showToast('作業中の画面消灯を防止します', 'success');
+
+          state.wakeLock.addEventListener('release', () => {
+            state.wakeLock = null;
+            dom.wakeLockText.textContent = '常時点灯OFF';
+            dom.btnWakeLock.classList.remove('border-amber-400', 'text-amber-300');
+          });
+        } catch (err) {
+          showToast('常時点灯の有効化に失敗しました', 'warn');
+        }
+      }
+    }
+
+    // =========================================================================
+    // 14. デモ移動モード（PC・屋内テスト用仮想座標シミュレーション）
+    // =========================================================================
+    function toggleDemoMode() {
+      state.isDemoMode = !state.isDemoMode;
+      if (state.isDemoMode) {
+        dom.btnDemoToggle.innerHTML = '<span class="text-amber-300">デモ: ON</span>';
+        dom.btnDemoToggle.classList.add('border-amber-400', 'bg-amber-950/50');
+        dom.demoControls.classList.remove('hidden');
+
+        // 初期仮想位置を選択中水利の約25m南西に設定
+        const target = getSelectedHydrant() || state.hydrants[0];
+        state.userPos = {
+          lat: target.lat - 0.00018,
+          lon: target.lon - 0.00018,
+          accuracy: 4.5,
+          timestamp: Date.now()
+        };
+        state.heading = 20;
+        setMapAutoFollow(true, true);
+        showToast('デモモードON：左下のパッドで移動・回転できます', 'info');
+      } else {
+        dom.btnDemoToggle.innerHTML = '<span>デモ: OFF</span>';
+        dom.btnDemoToggle.classList.remove('border-amber-400', 'bg-amber-950/50');
+        dom.demoControls.classList.add('hidden');
+        showToast('デモモードを終了しました', 'info');
+      }
+      updateUI();
+    }
+
+    function handleDemoAction(action) {
+      if (!state.isDemoMode) return;
+      const step = 0.000045; // 約4〜5m移動
+      switch (action) {
+        case 'north':
+          state.userPos.lat += step;
+          break;
+        case 'south':
+          state.userPos.lat -= step;
+          break;
+        case 'east':
+          state.userPos.lon += step;
+          break;
+        case 'west':
+          state.userPos.lon -= step;
+          break;
+        case 'rotL':
+          state.heading = (state.heading - 15 + 360) % 360;
+          break;
+        case 'rotR':
+          state.heading = (state.heading + 15) % 360;
+          break;
+        case 'err':
+          if (state.userPos.accuracy <= 3) state.userPos.accuracy = 6.0;
+          else if (state.userPos.accuracy <= 8) state.userPos.accuracy = 12.5;
+          else state.userPos.accuracy = 2.4;
+          break;
+      }
+      updateUI();
+    }
+
+    // =========================================================================
+    // 15. モーダル制御（水利一覧・登録/編集・JSON入出力）
+    // =========================================================================
+    function renderHydrantList(keyword = '') {
+      const container = dom.hydrantListContainer;
+      container.innerHTML = '';
+
+      const kw = keyword.trim().toLowerCase();
+      let list = state.hydrants.map((h) => {
+        const dist =
+          state.userPos.lat !== null
+            ? GeoUtils.calcDistance(state.userPos.lat, state.userPos.lon, h.lat, h.lon)
+            : null;
+        return { ...h, dist };
+      });
+
+      if (state.userPos.lat !== null) {
+        list.sort((a, b) => a.dist - b.dist);
+      }
+
+      if (kw) {
+        list = list.filter(
+          (h) =>
+            h.name.toLowerCase().includes(kw) ||
+            h.offset.toLowerCase().includes(kw) ||
+            h.type.toLowerCase().includes(kw)
+        );
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = '<div class="text-center text-slate-400 py-8 text-sm">該当する水利が見つかりません</div>';
+        return;
+      }
+
+      list.forEach((h) => {
+        const isSelected = h.id === state.selectedId;
+        const card = document.createElement('button');
+        card.type = 'button';
+        card.className = `w-full text-left p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
+          isSelected
+            ? 'bg-sky-950/60 border-sky-400'
+            : 'bg-slate-900 border-slate-700 hover:border-slate-500'
+        }`;
+
+        const distText =
+          h.dist !== null
+            ? h.dist < 1000
+              ? `${Math.round(h.dist)} m`
+              : `${(h.dist / 1000).toFixed(2)} km`
+            : '-- m';
+
+        card.innerHTML = `
+          <div class="flex items-center justify-between gap-2">
+            <span class="px-2 py-0.5 rounded text-[11px] font-bold bg-red-500/20 text-red-400 border border-red-500/30">${h.type} / ${h.cover}</span>
+            <span class="text-base font-black text-sky-400 tabular-nums">${distText}</span>
+          </div>
+          <div class="text-base font-black text-white mt-1">${h.name}</div>
+          <div class="text-xs text-amber-300 mt-1 line-clamp-1">目印: ${h.offset}</div>
+        `;
+
+        card.addEventListener('click', () => {
+          state.selectedId = h.id;
+          dom.modalList.classList.add('hidden');
+          // 地図モードで現在地未測位の場合は選択水利へセンタリング
+          if (state.viewMode === 'map' && mapCtx.isReady && state.userPos.lat === null) {
+            mapCtx.map.setView([h.lat, h.lon], 17);
+          }
+          updateUI();
+          showToast(`「${h.name}」をセットしました`, 'success');
+        });
+
+        container.appendChild(card);
+      });
+    }
+
+    function openRegisterModal(editHydrant = null) {
+      if (editHydrant) {
+        dom.registerModalTitle.textContent = '水利情報の編集・座標補正';
+        dom.formId.value = editHydrant.id;
+        dom.formName.value = editHydrant.name;
+        dom.formType.value = editHydrant.type;
+        dom.formCover.value = editHydrant.cover;
+        dom.formLat.value = editHydrant.lat;
+        dom.formLon.value = editHydrant.lon;
+        dom.formOffset.value = editHydrant.offset;
+        dom.btnDeleteHydrant.classList.remove('hidden');
+      } else {
+        dom.registerModalTitle.textContent = '新規水利登録・データ管理';
+        dom.hydrantForm.reset();
+        dom.formId.value = '';
+        dom.btnDeleteHydrant.classList.add('hidden');
+        if (state.userPos.lat !== null) {
+          dom.formLat.value = state.userPos.lat.toFixed(6);
+          dom.formLon.value = state.userPos.lon.toFixed(6);
+        }
+      }
+      dom.modalRegister.classList.remove('hidden');
+    }
+
+    // =========================================================================
+    // 16. イベントリスナー登録 & 初期化
+    // =========================================================================
+    function bindEvents() {
+      dom.btnStartSensors.addEventListener('click', startSensors);
+      dom.btnWakeLock.addEventListener('click', toggleWakeLock);
+      dom.btnDemoToggle.addEventListener('click', toggleDemoMode);
+
+      // 3モード切替タブ
+      dom.tabModeMap.addEventListener('click', () => switchViewMode('map'));
+      dom.tabModeRadar.addEventListener('click', () => switchViewMode('radar'));
+      dom.tabModeAr.addEventListener('click', () => switchViewMode('ar'));
+      dom.btnFallbackToRadar.addEventListener('click', () => switchViewMode('radar'));
+
+      // 地図コントロール：タイルレイヤー切替（地理院標準 -> 航空写真 -> OSM）
+      dom.btnMapLayer.addEventListener('click', () => {
+        if (!mapCtx.isReady) return;
+        state.mapTileIdx = (state.mapTileIdx + 1) % state.mapTileKeys.length;
+        const nextKey = state.mapTileKeys[state.mapTileIdx];
+        const nextTileObj = mapCtx.tileLayers[nextKey];
+
+        if (mapCtx.currentTileLayer) {
+          mapCtx.map.removeLayer(mapCtx.currentTileLayer);
+        }
+        mapCtx.currentTileLayer = nextTileObj.layer;
+        mapCtx.currentTileLayer.addTo(mapCtx.map);
+        dom.mapLayerLabel.textContent = nextTileObj.name;
+        showToast(`地図表示を「${nextTileObj.name}」に切り替えました`, 'info');
+      });
+
+      // 地図コントロール：現在地追従切替
+      dom.btnMapFollow.addEventListener('click', () => {
+        setMapAutoFollow(!state.mapAutoFollow, false);
+      });
+
+      // 地図コントロール：ヘディングアップ / ノースアップ切替
+      dom.btnMapHeadingUp.addEventListener('click', () => {
+        state.mapHeadingUp = !state.mapHeadingUp;
+        if (state.mapHeadingUp) {
+          dom.mapHeadingUpLabel.textContent = 'ヘディングアップ(進行方向上)';
+          dom.btnMapHeadingUp.classList.add('border-amber-400', 'text-amber-300');
+          setMapAutoFollow(true, true);
+          showToast('進行方向が上になるように地図を回転します', 'info');
+        } else {
+          dom.mapHeadingUpLabel.textContent = 'ノースアップ(北上)';
+          dom.btnMapHeadingUp.classList.remove('border-amber-400', 'text-amber-300');
+          showToast('北を上に固定しました', 'info');
+        }
+        syncMapMarkers();
+      });
+
+      // 地図ズームボタン
+      dom.btnMapZoomIn.addEventListener('click', () => {
+        if (mapCtx.isReady) mapCtx.map.zoomIn();
+      });
+      dom.btnMapZoomOut.addEventListener('click', () => {
+        if (mapCtx.isReady) mapCtx.map.zoomOut();
+      });
+
+      // レーダー表示縮尺切替
+      dom.btnRadarScale.addEventListener('click', () => {
+        state.radarScaleIdx = (state.radarScaleIdx + 1) % state.radarScales.length;
+        const scale = state.radarScales[state.radarScaleIdx];
+        dom.btnRadarScale.textContent = `範囲: ${scale}m`;
+        drawRadar();
+      });
+
+      // デモ移動パッド
+      dom.demoControls.querySelectorAll('button[data-demo]').forEach((btn) => {
+        btn.addEventListener('click', () => handleDemoAction(btn.dataset.demo));
+      });
+
+      // 最寄り水利選択
+      dom.btnNearest.addEventListener('click', () => selectNearestHydrant(false));
+
+      // 水利一覧モーダル
+      dom.btnOpenList.addEventListener('click', () => {
+        dom.searchHydrant.value = '';
+        renderHydrantList();
+        dom.modalList.classList.remove('hidden');
+      });
+      dom.searchHydrant.addEventListener('input', (e) => renderHydrantList(e.target.value));
+
+      // 一覧モーダルから新規登録モーダルへ
+      dom.btnOpenRegisterFromList.addEventListener('click', () => {
+        dom.modalList.classList.add('hidden');
+        openRegisterModal(null);
+      });
+
+      // 編集モーダル
+      dom.btnEditCurrent.addEventListener('click', () => {
+        const current = getSelectedHydrant();
+        if (current) openRegisterModal(current);
+      });
+
+      // モーダル閉じるボタン共通
+      document.querySelectorAll('[data-close-modal]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const targetId = btn.getAttribute('data-close-modal');
+          document.getElementById(targetId).classList.add('hidden');
+        });
+      });
+
+      // 現在地GPSをフォームへ反映
+      dom.btnFillCurrentGps.addEventListener('click', () => {
+        if (state.userPos.lat === null) {
+          showToast('現在地GPSがまだ取得できていません', 'warn');
+          return;
+        }
+        dom.formLat.value = state.userPos.lat.toFixed(6);
+        dom.formLon.value = state.userPos.lon.toFixed(6);
+        showToast('現在地の緯度・経度を反映しました', 'success');
+      });
+
+      // フォーム保存処理
+      dom.hydrantForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const id = dom.formId.value;
+        const item = {
+          id: id || 'hyd-' + Date.now(),
+          name: dom.formName.value.trim(),
+          type: dom.formType.value,
+          cover: dom.formCover.value,
+          lat: parseFloat(dom.formLat.value),
+          lon: parseFloat(dom.formLon.value),
+          offset: dom.formOffset.value.trim()
+        };
+
+        if (id) {
+          const idx = state.hydrants.findIndex((h) => h.id === id);
+          if (idx !== -1) state.hydrants[idx] = item;
+        } else {
+          state.hydrants.push(item);
+        }
+
+        state.selectedId = item.id;
+        saveHydrants();
+        dom.modalRegister.classList.add('hidden');
+        updateUI();
+        showToast('水利データを保存しました', 'success');
+      });
+
+      // 水利削除処理
+      dom.btnDeleteHydrant.addEventListener('click', () => {
+        const id = dom.formId.value;
+        if (!id) return;
+        if (state.hydrants.length <= 1) {
+          showToast('最低1件の水利データが必要です', 'warn');
+          return;
+        }
+        state.hydrants = state.hydrants.filter((h) => h.id !== id);
+        state.selectedId = state.hydrants[0].id;
+        saveHydrants();
+        dom.modalRegister.classList.add('hidden');
+        updateUI();
+        showToast('水利データを削除しました', 'info');
+      });
+
+      // JSONエクスポート
+      dom.btnExportJson.addEventListener('click', () => {
+        const jsonStr = JSON.stringify(state.hydrants, null, 2);
+        const ta = document.createElement('textarea');
+        ta.value = jsonStr;
+        document.body.appendChild(ta);
+        ta.select();
+        try {
+          document.execCommand('copy');
+        } catch (e) {}
+        document.body.removeChild(ta);
+
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hydrants_backup_${new Date().toISOString().slice(0, 10)}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+
+        showToast('JSONファイルを出力しクリップボードにもコピーしました', 'success');
+      });
+
+      // JSONインポート
+      dom.inputImportJson.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const data = JSON.parse(ev.target.result);
+            if (!Array.isArray(data) || data.length === 0 || !data[0].lat || !data[0].lon) {
+              throw new Error('Invalid format');
+            }
+            state.hydrants = data;
+            state.selectedId = data[0].id || 'hyd-0';
+            saveHydrants();
+            dom.modalRegister.classList.add('hidden');
+            updateUI();
+            showToast(`${data.length}件の水利データを読み込みました`, 'success');
+          } catch (err) {
+            showToast('JSONファイルの形式が正しくありません', 'error');
+          }
+          e.target.value = '';
+        };
+        reader.readAsText(file);
+      });
+
+      // 初期サンプルデータリセット
+      dom.btnResetSample.addEventListener('click', () => {
+        state.hydrants = JSON.parse(JSON.stringify(DEFAULT_HYDRANTS));
+        state.selectedId = state.hydrants[0].id;
+        saveHydrants();
+        dom.modalRegister.classList.add('hidden');
+        updateUI();
+        showToast('初期サンプルデータに戻しました', 'info');
+      });
+
+      // 画面リサイズ時の再描画
+      window.addEventListener('resize', () => {
+        if (state.viewMode === 'radar') drawRadar();
+        if (state.viewMode === 'map' && mapCtx.isReady && mapCtx.map) {
+          mapCtx.map.invalidateSize();
+        }
+      });
+    }
+
+    // アプリ起動
+    window.addEventListener('DOMContentLoaded', () => {
+      loadHydrants();
+      state.selectedId = state.hydrants[0].id;
+      initLeafletMap();
+      bindEvents();
+      updateUI();
+    });
+  </script>
+</body>
+</html>
