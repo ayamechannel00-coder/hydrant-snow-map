@@ -27,13 +27,18 @@
       overscroll-behavior: none;
     }
 
+    /* iOS自動ズーム防止のため入力欄は16px以上を確保 */
+    input, select, textarea {
+      font-size: 16px !important;
+    }
+
     .ui-lock-zoom {
       touch-action: manipulation;
       user-select: none;
     }
 
     .glove-btn {
-      min-height: 50px;
+      min-height: 48px;
       border-radius: 14px;
       font-weight: 800;
       display: inline-flex;
@@ -49,15 +54,64 @@
       font-variant-numeric: tabular-nums;
     }
 
+    /* =========================================================================
+       重なり順（スタッキングコンテキスト）の明確化
+       Leaflet地図は z-index: 1 に閉じ込め、UIボタンやモーダルが必ず前面に来るようにする
+       ========================================================================= */
+    #map-wrapper {
+      position: relative;
+      flex: 1 1 0%;
+      width: 100%;
+      overflow: hidden;
+      background-color: #0b101b;
+      z-index: 1;
+    }
+
     #leaflet-map {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
+      z-index: 1 !important;
       background-color: #0b101b;
       touch-action: pan-x pan-y pinch-zoom;
     }
 
+    /* Leaflet内部ペインが外部UIのz-indexを超えないように固定 */
+    #leaflet-map .leaflet-pane { z-index: 2; }
+    #leaflet-map .leaflet-tile-pane { z-index: 2; }
+    #leaflet-map .leaflet-overlay-pane { z-index: 4; }
+    #leaflet-map .leaflet-shadow-pane { z-index: 5; }
+    #leaflet-map .leaflet-marker-pane { z-index: 6; }
+    #leaflet-map .leaflet-tooltip-pane { z-index: 7; }
+    #leaflet-map .leaflet-popup-pane { z-index: 8; }
+    #leaflet-map .leaflet-top,
+    #leaflet-map .leaflet-bottom { z-index: 10; }
+
+    /* アプリ本体UI・フローティング操作・モーダル階層 */
+    .app-header {
+      position: relative;
+      z-index: 1200;
+    }
+    .app-footer {
+      position: relative;
+      z-index: 1200;
+    }
+    .map-overlay-ui {
+      z-index: 1050;
+    }
+    .map-relocate-ui {
+      z-index: 1150;
+    }
+    .app-modal {
+      z-index: 2500;
+    }
+    .app-toast {
+      z-index: 3000;
+    }
+
     .leaflet-control-attribution {
-      background: rgba(11, 16, 27, 0.82) !important;
+      background: rgba(11, 16, 27, 0.85) !important;
       color: #94a3b8 !important;
       font-size: 9px !important;
       padding: 1px 6px !important;
@@ -71,12 +125,12 @@
       color: #f8fafc !important;
       border: 1.5px solid #475569 !important;
       border-radius: 16px !important;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.78) !important;
+      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.85) !important;
       padding: 0 !important;
     }
     .leaflet-popup-content {
-      margin: 10px 12px !important;
-      min-width: 220px;
+      margin: 11px 13px !important;
+      min-width: 225px;
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
     }
     .leaflet-popup-tip {
@@ -85,17 +139,18 @@
     }
     .leaflet-popup-close-button {
       color: #94a3b8 !important;
-      font-size: 20px !important;
+      font-size: 22px !important;
       padding: 6px 8px !important;
     }
 
-    @keyframes selectedPulse {
-      0% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.85); }
-      70% { transform: scale(1.05); box-shadow: 0 0 0 12px rgba(250, 204, 21, 0); }
-      100% { transform: scale(0.97); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
+    /* 選択中シンボルの脈動ハイライト */
+    @keyframes symbolSelectedPulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.9); }
+      70% { transform: scale(1.16); box-shadow: 0 0 0 10px rgba(250, 204, 21, 0); }
+      100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0); }
     }
-    .pin-selected {
-      animation: selectedPulse 1.6s infinite;
+    .symbol-selected-pulse {
+      animation: symbolSelectedPulse 1.5s infinite;
     }
 
     ::-webkit-scrollbar {
@@ -113,8 +168,8 @@
 </head>
 <body class="flex flex-col h-dvh overflow-hidden bg-[#0b101b] text-slate-100">
 
-  <!-- 上部ヘッダー：GNSS精度・修正数・フィルタ・GPS追従＆自動パン制御 -->
-  <header class="ui-lock-zoom bg-[#111827] border-b border-slate-800 px-3 pt-2 pb-2 shrink-0 z-30 shadow-lg">
+  <!-- 上部ヘッダー（z-index: 1200） -->
+  <header class="app-header ui-lock-zoom bg-[#111827] border-b border-slate-800 px-3 pt-2 pb-2 shrink-0 shadow-lg">
     <div class="flex items-center justify-between gap-2">
       <div class="flex items-center gap-1.5 min-w-0">
         <div id="gnss-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b101b] border border-slate-700 shrink-0">
@@ -146,26 +201,30 @@
       </div>
     </div>
 
-    <!-- 種別＆市町村フィルタ -->
+    <!-- 種別＆市町村フィルタ + シンボル凡例 -->
     <div class="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
       <div id="filter-chips" class="flex items-center gap-1 shrink-0">
         <button type="button" data-filter="all" class="px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-sky-500 text-slate-950">すべて</button>
-        <button type="button" data-filter="underground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300">地下式</button>
-        <button type="button" data-filter="aboveground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300">地上式</button>
+        <button type="button" data-filter="underground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300 inline-flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-white inline-block"></span>地下
+        </button>
+        <button type="button" data-filter="aboveground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300 inline-flex items-center gap-1">
+          <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 border border-white inline-block"></span>地上
+        </button>
         <button type="button" data-filter="modified" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-amber-500/60 text-amber-300">修正済</button>
       </div>
-      <select id="city-select" aria-label="市町村フィルタ" class="ml-auto px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-200 shrink-0 max-w-[115px] truncate">
+      <select id="city-select" aria-label="市町村フィルタ" class="ml-auto px-2 py-1 rounded-lg bg-[#0b101b] border border-slate-700 text-xs font-bold text-slate-200 shrink-0 max-w-[115px] truncate">
         <option value="all">全市町村</option>
       </select>
     </div>
   </header>
 
-  <!-- 中央地図エリア -->
-  <main class="relative flex-1 overflow-hidden bg-[#0b101b]">
+  <!-- 中央地図エリア（#map-wrapper 内 #leaflet-map は z-index: 1） -->
+  <main id="map-wrapper">
     <div id="leaflet-map"></div>
 
-    <!-- 左上HUD：選択ターゲット距離＆方位 -->
-    <div id="target-hud" class="ui-lock-zoom absolute top-3 left-3 z-20 bg-[#0b101b]/90 border border-slate-700/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-xl pointer-events-none max-w-[170px]">
+    <!-- 左上HUD：選択ターゲット距離＆方位（pointer-events-none で地図操作を妨げない） -->
+    <div id="target-hud" class="map-overlay-ui ui-lock-zoom absolute top-3 left-3 bg-[#0b101b]/90 border border-slate-700/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-xl pointer-events-none max-w-[165px]">
       <div class="flex items-center gap-1">
         <span class="text-[10px] font-bold text-slate-400">ターゲット距離</span>
         <span id="arrival-badge" class="hidden px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-black">至近圏</span>
@@ -179,8 +238,8 @@
       </div>
     </div>
 
-    <!-- 位置修正モードバナー -->
-    <div id="relocate-panel" class="ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 z-30 bg-amber-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md">
+    <!-- 位置修正モードバナー（z-index: 1150） -->
+    <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 bg-amber-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md pointer-events-auto">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="text-xs font-black text-amber-300 truncate">
@@ -207,35 +266,30 @@
       </div>
     </div>
 
-    <!-- 右上コントロール：表示件数バッジ・地図レイヤー切替・住所ラベル切替・現在地中心 -->
-    <div id="map-controls-right" class="ui-lock-zoom absolute top-3 right-3 z-20 flex flex-col items-end gap-1.5">
+    <!-- 右上コントロール：表示件数バッジ・地図レイヤー切替・現在地移動（z-index: 1050） -->
+    <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-3 right-3 flex flex-col items-end gap-1.5 pointer-events-none">
       <div id="viewport-badge" class="px-2.5 py-1.5 rounded-2xl bg-[#0b101b]/92 border border-slate-600 text-[11px] font-black text-emerald-300 shadow-lg tabular-nums pointer-events-none">
         表示: 0 / 範囲内0件 (全0件)
       </div>
 
-      <button id="btn-layer-cycle" type="button" class="px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-white shadow-lg flex items-center gap-1.5 active:scale-95">
+      <button id="btn-layer-cycle" type="button" class="pointer-events-auto px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-white shadow-lg flex items-center gap-1.5 active:scale-95">
         <span class="text-sky-400">地図:</span>
         <span id="layer-name">標準地図</span>
       </button>
 
-      <button id="btn-label-toggle" type="button" class="px-3 py-2 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center gap-1.5 active:scale-95">
-        <span>住所ラベル</span>
-        <span id="label-state" class="font-black">ON</span>
-      </button>
-
-      <button id="btn-center-user" type="button" class="px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-sky-300 shadow-lg flex items-center gap-1 active:scale-95">
+      <button id="btn-center-user" type="button" class="pointer-events-auto px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-sky-300 shadow-lg flex items-center gap-1 active:scale-95">
         <span>現在地へ移動</span>
       </button>
     </div>
 
-    <!-- 右下ズーム操作 -->
-    <div class="ui-lock-zoom absolute bottom-3 right-3 z-20 flex flex-col gap-2">
+    <!-- 右下ズーム操作（z-index: 1050） -->
+    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
       <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
       <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
     </div>
 
-    <!-- 左下デモパッド（デモON時のみ表示） -->
-    <div id="demo-pad" class="ui-lock-zoom hidden absolute bottom-3 left-3 z-30 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl">
+    <!-- 左下デモパッド（デモON時のみ表示、z-index: 1050） -->
+    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-3 left-3 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
         <div></div>
@@ -251,8 +305,8 @@
     </div>
   </main>
 
-  <!-- 下部パネル：ターゲット詳細・SV・位置修正・TSVコピー・大型操作ボタン -->
-  <footer class="ui-lock-zoom bg-[#111827] border-t border-slate-800 px-3 pt-2 pb-2.5 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
+  <!-- 下部パネル：ターゲット詳細・SV・位置修正・TSVコピー・大型操作ボタン（z-index: 1200） -->
+  <footer class="app-footer ui-lock-zoom bg-[#111827] border-t border-slate-800 px-3 pt-2 pb-2.5 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
     <div class="bg-[#0b101b]/95 border border-slate-800 rounded-2xl p-2.5 mb-2">
       <div class="flex items-center gap-1.5 flex-wrap">
         <span id="detail-no" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/40 tabular-nums">No.--</span>
@@ -263,7 +317,7 @@
       </div>
 
       <h1 id="detail-address" class="text-sm sm:text-base font-black text-white mt-1 truncate">
-        消火栓を選択してください
+        シンボルをタップして消火栓を選択
       </h1>
 
       <div class="mt-1.5 bg-amber-500/10 border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
@@ -302,8 +356,8 @@
     </div>
   </footer>
 
-  <!-- モーダル1：一覧検索・修正済TSV出力 -->
-  <div id="modal-list" class="hidden fixed inset-0 z-50 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-3">
+  <!-- モーダル1：一覧検索・修正済TSV出力（z-index: 2500） -->
+  <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-3">
     <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
         <div>
@@ -321,7 +375,7 @@
       </div>
 
       <div class="p-3 border-b border-slate-800 bg-[#0b101b]/60 space-y-2">
-        <input id="list-search" type="text" placeholder="住所・地番・番号・位置メモ・グリッドで検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white text-sm focus:outline-none focus:border-sky-400">
+        <input id="list-search" type="text" placeholder="住所・地番・番号・位置メモ・グリッドで検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
         <div class="flex items-center justify-between gap-2">
           <label class="flex items-center gap-1.5 text-xs font-bold text-emerald-300 cursor-pointer">
             <input id="chk-list-bounds" type="checkbox" checked class="accent-emerald-400 w-4 h-4">
@@ -341,8 +395,8 @@
     </div>
   </div>
 
-  <!-- モーダル2：13列データ読込・単体編集・TSV/CSV出力 -->
-  <div id="modal-data" class="hidden fixed inset-0 z-50 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-2.5 sm:p-4 overflow-y-auto">
+  <!-- モーダル2：13列データ読込・単体編集・TSV/CSV出力（z-index: 2500） -->
+  <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-2.5 sm:p-4 overflow-y-auto">
     <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto my-auto overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
         <h2 id="data-modal-title" class="text-base font-black text-white">13列データ読込 / 編集 / 出力</h2>
@@ -362,7 +416,7 @@
         <div id="pane-import" class="space-y-3.5">
           <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-sky-400">① 公開CSV URLから取得</div>
-            <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white text-xs focus:outline-none focus:border-sky-400">
+            <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
             <button id="btn-fetch-csv" type="button" class="w-full py-2.5 rounded-xl bg-sky-500 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
               URLから読み込み
             </button>
@@ -373,10 +427,15 @@
             <p class="text-[10px] text-slate-400">
               列順: 1:番号 / 2:住所・地番 / 3:緯度 / 4:経度 / 5:市町村 / 6:位置メモ / 7:種別 / 8:規模 / 9:口径 / 10:備考 / 11:標識 / 12:地図グリッド / 13:SV URL
             </p>
-            <textarea id="paste-data-textarea" rows="4" placeholder="スプレッドシートからコピーした行を貼り付け..." class="w-full p-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-amber-400"></textarea>
+            <textarea id="paste-data-textarea" rows="3" placeholder="スプレッドシートからコピーした行を貼り付け..." class="w-full p-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-400"></textarea>
             <button id="btn-import-paste" type="button" class="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
               貼り付けデータを反映
             </button>
+          </div>
+
+          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
+            <div class="text-xs font-black text-emerald-300">③ CSV / TSVファイルを選択して読込（オフライン対応）</div>
+            <input id="file-upload-input" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-500 file:text-slate-950">
           </div>
 
           <div class="grid grid-cols-2 gap-2">
@@ -396,15 +455,15 @@
             <div class="grid grid-cols-3 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-slate-300 mb-1">1: 番号</label>
-                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-xs tabular-nums">
+                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-300 mb-1">5: 市町村</label>
-                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-xs">
+                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-300 mb-1">7: 種別</label>
-                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-xs font-bold">
+                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white font-bold">
                   <option value="地下式">地下式</option>
                   <option value="地上式">地上式</option>
                   <option value="防火水槽">防火水槽</option>
@@ -415,52 +474,52 @@
 
             <div>
               <label class="block text-[11px] font-bold text-slate-300 mb-1">2: 住所・地番（必須）</label>
-              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-sm">
+              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">3: 緯度 (Lat)</label>
-                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-sm tabular-nums">
+                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">4: 経度 (Lon)</label>
-                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-sm tabular-nums">
+                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
               </div>
             </div>
 
             <div>
               <label class="block text-[11px] font-bold text-amber-300 mb-1">6: 位置メモ・目印（積雪期の基準点）</label>
-              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white text-sm">
+              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
             </div>
 
             <div class="grid grid-cols-4 gap-1.5">
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">8: 規模</label>
-                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs">
+                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">9: 口径</label>
-                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs tabular-nums">
+                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">11: 標識</label>
-                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs">
+                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">12: グリッド</label>
-                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs tabular-nums">
+                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white tabular-nums">
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">10: 備考</label>
-                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs">
+                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-400 mb-1">13: SV URL</label>
-                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white text-xs">
+                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
               </div>
             </div>
 
@@ -493,8 +552,8 @@
     </div>
   </div>
 
-  <!-- トースト通知 -->
-  <div id="toast-box" class="ui-lock-zoom fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-1.5 w-[92%] max-w-sm"></div>
+  <!-- トースト通知（z-index: 3000） -->
+  <div id="toast-box" class="app-toast ui-lock-zoom fixed top-28 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-1.5 w-[92%] max-w-sm"></div>
 
   <script>
     (function () {
@@ -504,17 +563,15 @@
       // 定数・初期データ（新発田市周辺）
       // =====================================================================
       const MAX_DISPLAY_ITEMS = 100;
-      const LABEL_MIN_ZOOM = 15;
       const GPS_MIN_INTERVAL_MS = 2000;
       const GPS_MIN_DISPLACEMENT_M = 5.0;
       const GPS_MAX_ACCURACY_M = 150.0;
       const VIEWPORT_DEBOUNCE_MS = 120;
 
       const STORAGE_KEYS = {
-        DATA: 'shibata_hydrant_finder_v1_data',
-        URL: 'shibata_hydrant_finder_v1_url',
-        AUTOPAN: 'shibata_hydrant_finder_v1_autopan',
-        LABELS: 'shibata_hydrant_finder_v1_labels'
+        DATA: 'shibata_hydrant_finder_v2_data',
+        URL: 'shibata_hydrant_finder_v2_url',
+        AUTOPAN: 'shibata_hydrant_finder_v2_autopan'
       };
 
       const SAMPLE_SHIBATA_HYDRANTS = [
@@ -636,7 +693,6 @@
         selectedId: null,
         filterType: 'all',
         filterCity: 'all',
-        showLabels: true,
         autoPanOnTrack: false,
         isDemo: false,
         watchId: null,
@@ -706,8 +762,6 @@
         viewportBadge: $('viewport-badge'),
         btnLayerCycle: $('btn-layer-cycle'),
         layerName: $('layer-name'),
-        btnLabelToggle: $('btn-label-toggle'),
-        labelState: $('label-state'),
         btnCenterUser: $('btn-center-user'),
         btnZoomIn: $('btn-zoom-in'),
         btnZoomOut: $('btn-zoom-out'),
@@ -738,7 +792,6 @@
         btnCopyAllTsv: $('btn-copy-all-tsv'),
         listContainer: $('list-container'),
         modalData: $('modal-data'),
-        dataModalTitle: $('data-modal-title'),
         tabImport: $('tab-import'),
         tabEdit: $('tab-edit'),
         tabExport: $('tab-export'),
@@ -749,6 +802,7 @@
         btnFetchCsv: $('btn-fetch-csv'),
         pasteDataTextarea: $('paste-data-textarea'),
         btnImportPaste: $('btn-import-paste'),
+        fileUploadInput: $('file-upload-input'),
         btnLoadShibataDemo: $('btn-load-shibata-demo'),
         btnClearStorage: $('btn-clear-storage'),
         editForm: $('edit-form'),
@@ -863,7 +917,7 @@
         return 'other';
       }
 
-      /** 住所・地番（第2列）最優先表示ヘルパー */
+      /** ポップアップ・一覧・下部詳細で使う住所・地番（第2列）最優先表示 */
       function getAddressPrimary(h) {
         if (!h) return '住所未登録';
         const addr = String(h.address || '').trim();
@@ -1059,10 +1113,6 @@
           if (savedAutopan !== null) {
             state.autoPanOnTrack = savedAutopan === 'true';
           }
-          const savedLabels = localStorage.getItem(STORAGE_KEYS.LABELS);
-          if (savedLabels !== null) {
-            state.showLabels = savedLabels === 'true';
-          }
         } catch (err) {
           // ストレージアクセス失敗時はサンプルへフォールバック
         }
@@ -1143,8 +1193,8 @@
         const east = bounds.getEast();
 
         const center = mapRef.map.getCenter();
-        const refLat = state.watchId !== null && state.userPos.lat !== null ? state.userPos.lat : center.lat;
-        const refLon = state.watchId !== null && state.userPos.lon !== null ? state.userPos.lon : center.lng;
+        const refLat = center.lat;
+        const refLon = center.lng;
 
         const inside = [];
         for (let i = 0; i < filtered.length; i++) {
@@ -1165,7 +1215,7 @@
             .map((entry) => entry.h);
         }
 
-        // 選択中のターゲットは画面外でも常に保持
+        // 選択中のターゲットは常に保持
         if (selected && !selectedList.some((h) => h.id === selected.id)) {
           if (selectedList.length >= MAX_DISPLAY_ITEMS) {
             selectedList[selectedList.length - 1] = selected;
@@ -1178,7 +1228,7 @@
       }
 
       // =====================================================================
-      // Leaflet 地図初期化＆マーカー・住所ラベル描画
+      // Leaflet 地図初期化＆文字なしコンパクトシンボル描画
       // =====================================================================
       function initMap() {
         if (typeof L === 'undefined') {
@@ -1235,7 +1285,7 @@
         mapRef.routeLine = L.polyline([], {
           color: '#facc15',
           weight: 3,
-          opacity: 0.8,
+          opacity: 0.85,
           dashArray: '6, 6'
         }).addTo(mapRef.map);
 
@@ -1259,51 +1309,95 @@
         renderViewportMarkers();
       }
 
-      function createPinIcon(h, isSelected, showTextLabel) {
+      /**
+       * 文字・地番を一切表示しないコンパクトな幾何シンボルアイコンを生成
+       * - 地下式: 18px〜22px シアン円形 + 白枠 + 内側リング/ドット
+       * - 地上式: 18px〜22px レッド角丸スクエア + 白枠 + 内側白ドット
+       * - 選択中: ゴールド外周リング + 脈動アニメーション
+       * - 修正済: 右上に小さな黄色ドットバッジ
+       */
+      function createSymbolIcon(h, isSelected) {
         const kind = getTypeKind(h.type);
         const isUg = kind === 'underground';
         const isAg = kind === 'aboveground';
 
-        // 地下式：シアン系四角バッジ / 地上式：赤系丸・ピラー風バッジ
-        const shapeCls = isUg ? 'rounded-md' : 'rounded-full';
-        const colorCls = isUg
-          ? 'bg-cyan-500 text-slate-950'
-          : isAg
-          ? 'bg-rose-600 text-white'
-          : 'bg-amber-500 text-slate-950';
+        const boxSize = isSelected ? 24 : 20;
+        const half = boxSize / 2;
 
-        const ringCls = isSelected
-          ? 'border-[3px] border-yellow-300 pin-selected'
-          : h.modified
-          ? 'border-2 border-amber-300'
-          : 'border-2 border-white';
-
-        const primaryAddr = getAddressPrimary(h);
-        const shortAddr = primaryAddr.length > 10 ? primaryAddr.slice(0, 9) + '…' : primaryAddr;
-
-        const modBadge = h.modified
-          ? `<span class="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 rounded-full bg-amber-400 border border-slate-950 text-[8px] font-black text-slate-950 flex items-center justify-center">修</span>`
+        // 修正済を示す極小イエロードット（文字なし）
+        const modDot = h.modified
+          ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #0b101b;box-shadow:0 1px 3px rgba(0,0,0,0.8);"></span>`
           : '';
 
-        const labelBlock = showTextLabel
-          ? `<div class="mt-1 px-1.5 py-0.5 rounded-md bg-[#0b101b]/92 border ${
-              isSelected ? 'border-yellow-300 text-yellow-200' : 'border-slate-600 text-white'
-            } text-[10px] font-black whitespace-nowrap shadow pointer-events-none">${escapeHtml(primaryAddr)}</div>`
-          : '';
+        const outerBorder = isSelected ? '2.5px solid #facc15' : '2px solid #ffffff';
+        const pulseCls = isSelected ? 'symbol-selected-pulse' : '';
+
+        let innerShapeHtml = '';
+        if (isUg) {
+          // 地下式：シアン円形 + 内側リング
+          innerShapeHtml = `
+            <div class="${pulseCls}" style="
+              position:relative;
+              width:${boxSize}px;
+              height:${boxSize}px;
+              border-radius:9999px;
+              background:#06b6d4;
+              border:${outerBorder};
+              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              display:flex;
+              align-items:center;
+              justify-content:center;
+            ">
+              <span style="width:7px;height:7px;border-radius:9999px;border:1.5px solid #083344;background:#ecfeff;"></span>
+              ${modDot}
+            </div>
+          `;
+        } else if (isAg) {
+          // 地上式：レッド角丸スクエア + 内側白ドット
+          innerShapeHtml = `
+            <div class="${pulseCls}" style="
+              position:relative;
+              width:${boxSize}px;
+              height:${boxSize}px;
+              border-radius:5px;
+              background:#e11d48;
+              border:${outerBorder};
+              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              display:flex;
+              align-items:center;
+              justify-content:center;
+            ">
+              <span style="width:6px;height:6px;border-radius:9999px;background:#ffffff;"></span>
+              ${modDot}
+            </div>
+          `;
+        } else {
+          // その他（防火水槽等）：アンバー角丸 + 内側枠
+          innerShapeHtml = `
+            <div class="${pulseCls}" style="
+              position:relative;
+              width:${boxSize}px;
+              height:${boxSize}px;
+              border-radius:6px;
+              background:#f59e0b;
+              border:${outerBorder};
+              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              display:flex;
+              align-items:center;
+              justify-content:center;
+            ">
+              <span style="width:6px;height:6px;border-radius:2px;background:#0b101b;"></span>
+              ${modDot}
+            </div>
+          `;
+        }
 
         return L.divIcon({
           className: '',
-          iconSize: [0, 0],
-          iconAnchor: [0, 0],
-          html: `
-            <div class="flex flex-col items-center" style="transform: translate(-50%, -16px); width: max-content;">
-              <div class="relative flex items-center justify-center min-w-[36px] h-[28px] px-2 ${shapeCls} ${colorCls} ${ringCls} shadow-lg text-[11px] font-black leading-none">
-                ${escapeHtml(shortAddr)}
-                ${modBadge}
-              </div>
-              ${labelBlock}
-            </div>
-          `
+          iconSize: [boxSize, boxSize],
+          iconAnchor: [half, half],
+          popupAnchor: [0, -half - 2],
+          html: innerShapeHtml
         });
       }
 
@@ -1325,10 +1419,10 @@
             <div class="text-xs font-black text-white">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(addr)}</div>
             <div class="text-[11px] text-amber-300 font-bold">${escapeHtml(h.offset || '--')}</div>
             <div class="grid grid-cols-2 gap-1.5 pt-1">
-              <a href="${escapeHtml(svHref)}" target="_blank" rel="noopener noreferrer" class="py-1.5 px-2 rounded-lg bg-emerald-600 text-white font-black text-[11px] text-center no-underline block">
+              <a href="${escapeHtml(svHref)}" target="_blank" rel="noopener noreferrer" class="py-2 px-2 rounded-lg bg-emerald-600 text-white font-black text-[11px] text-center no-underline block">
                 ストリートビュー
               </a>
-              <button type="button" onclick="window.__startRelocate('${escapeHtml(h.id)}')" class="py-1.5 px-2 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px]">
+              <button type="button" onclick="window.__startRelocate('${escapeHtml(h.id)}')" class="py-2 px-2 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px]">
                 位置を修正
               </button>
             </div>
@@ -1359,21 +1453,18 @@
         }
 
         mapRef.hydrantGroup.clearLayers();
-        const zoom = mapRef.map.getZoom();
-        const allowLabels = state.showLabels && zoom >= LABEL_MIN_ZOOM;
 
         for (let i = 0; i < items.length; i++) {
           const h = items[i];
           if (state.relocate.active && h.id === state.relocate.targetId) continue;
 
           const isSel = selected && h.id === selected.id;
-          const showLbl = allowLabels || isSel || Boolean(h.modified);
           const marker = L.marker([h.lat, h.lon], {
-            icon: createPinIcon(h, isSel, showLbl),
+            icon: createSymbolIcon(h, isSel),
             zIndexOffset: isSel ? 900 : h.modified ? 500 : 100
           });
 
-          marker.bindPopup(() => buildPopupHtml(h), { maxWidth: 260 });
+          marker.bindPopup(() => buildPopupHtml(h), { maxWidth: 270 });
           marker.on('click', () => {
             state.selectedId = h.id;
             updateDetailAndHud();
@@ -1408,12 +1499,20 @@
             zIndexOffset: 2500,
             icon: L.divIcon({
               className: '',
-              iconSize: [0, 0],
-              iconAnchor: [0, 0],
-              html: `<div style="transform: translate(-50%, -20px); width: max-content;">
-                <div class="px-2.5 py-1.5 rounded-full bg-amber-400 border-2 border-slate-950 text-slate-950 font-black text-xs shadow-2xl">
-                  修正位置
-                </div>
+              iconSize: [28, 28],
+              iconAnchor: [14, 14],
+              html: `<div style="
+                width:28px;
+                height:28px;
+                border-radius:9999px;
+                background:#facc15;
+                border:3px solid #0b101b;
+                box-shadow:0 0 0 2px #facc15, 0 4px 12px rgba(0,0,0,0.85);
+                display:flex;
+                align-items:center;
+                justify-content:center;
+              ">
+                <span style="width:8px;height:8px;border-radius:9999px;background:#0b101b;"></span>
               </div>`
             })
           }).addTo(mapRef.relocateGroup);
@@ -1493,7 +1592,6 @@
           draftLon: target.lon
         };
 
-        // 修正中は自動パンを止めて操作しやすくする
         state.autoPanOnTrack = false;
         syncToggleButtonsUI();
 
@@ -1553,6 +1651,7 @@
         if (dom.targetHud) dom.targetHud.classList.remove('hidden');
         if (dom.mapControlsRight) dom.mapControlsRight.classList.remove('hidden');
 
+        updateGnssHeader();
         updateDetailAndHud();
         renderViewportMarkers();
       }
@@ -1594,7 +1693,6 @@
             const lon = Number(pos.coords.longitude);
             const acc = Number(pos.coords.accuracy ?? 20);
 
-            // 無効座標・極端な外れ値ガード
             if (Number.isNaN(lat) || Number.isNaN(lon)) return;
             if (Math.abs(lat) < 0.01 && Math.abs(lon) < 0.01) return;
             if (acc > GPS_MAX_ACCURACY_M) return;
@@ -1606,7 +1704,6 @@
                 ? calcDistanceMeters(state.lastAcceptedLat, state.lastAcceptedLon, lat, lon)
                 : Infinity;
 
-            // 最低2000ms間隔 または 5m以上移動時に反映してスマホの負荷を抑制
             if (state.lastGpsAcceptedAt > 0 && elapsed < GPS_MIN_INTERVAL_MS && movedDist < GPS_MIN_DISPLACEMENT_M) {
               return;
             }
@@ -1619,7 +1716,6 @@
             updateGnssHeader();
             updateDetailAndHud();
 
-            // 自動パンは明示的にONの場合のみ、かつ前回パンから一定距離以上離れたときだけ実行
             if (state.autoPanOnTrack && !state.relocate.active && mapRef.map) {
               const panMoved =
                 state.lastPannedLat !== null && state.lastPannedLon !== null
@@ -1724,14 +1820,6 @@
         if (dom.autopanLabel) {
           dom.autopanLabel.textContent = state.autoPanOnTrack ? 'ON' : 'OFF';
           dom.autopanLabel.className = state.autoPanOnTrack ? 'text-emerald-400 font-black' : 'text-sky-400 font-black';
-        }
-        if (dom.labelState) {
-          dom.labelState.textContent = state.showLabels ? 'ON' : 'OFF';
-        }
-        if (dom.btnLabelToggle) {
-          dom.btnLabelToggle.className = state.showLabels
-            ? 'px-3 py-2 rounded-2xl bg-sky-500/20 border border-sky-400 text-xs font-bold text-sky-300 shadow-lg flex items-center gap-1.5 active:scale-95'
-            : 'px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-slate-400 shadow-lg flex items-center gap-1.5 active:scale-95';
         }
       }
 
@@ -2107,12 +2195,12 @@
                     : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-slate-700 text-slate-300';
                 } else if (b.dataset.filter === 'underground') {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-cyan-400 text-slate-950'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300';
+                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-cyan-400 text-slate-950 inline-flex items-center gap-1'
+                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300 inline-flex items-center gap-1';
                 } else if (b.dataset.filter === 'aboveground') {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-rose-500 text-white'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300';
+                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-rose-500 text-white inline-flex items-center gap-1'
+                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300 inline-flex items-center gap-1';
                 } else {
                   b.className = active
                     ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950'
@@ -2166,17 +2254,6 @@
             mapRef.activeLayer.addTo(mapRef.map);
             if (dom.layerName) dom.layerName.textContent = next.name;
             showToast(`地図: ${next.name}`, 'info');
-          });
-        }
-
-        if (dom.btnLabelToggle) {
-          dom.btnLabelToggle.addEventListener('click', () => {
-            state.showLabels = !state.showLabels;
-            try {
-              localStorage.setItem(STORAGE_KEYS.LABELS, String(state.showLabels));
-            } catch (e) {}
-            syncToggleButtonsUI();
-            renderViewportMarkers();
           });
         }
 
@@ -2294,6 +2371,22 @@
               return;
             }
             ingestRows(parseRowsFromText(txt), '貼り付けデータ');
+          });
+        }
+
+        if (dom.fileUploadInput) {
+          dom.fileUploadInput.addEventListener('change', (e) => {
+            const file = e.target.files && e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+              ingestRows(parseRowsFromText(String(ev.target.result || '')), file.name);
+              dom.fileUploadInput.value = '';
+            };
+            reader.onerror = () => {
+              showToast('ファイルの読み込みに失敗しました', 'error');
+            };
+            reader.readAsText(file, 'UTF-8');
           });
         }
 
