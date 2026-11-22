@@ -697,7 +697,7 @@
       // =====================================================================
       // 公開スプレッドシートCSV URL設定（必要に応じてここにURLを設定）
       // =====================================================================
-      const DEFAULT_PUBLISHED_CSV_URL = '';
+      const DEFAULT_PUBLISHED_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
 
       // =====================================================================
       // 描画・GPS・同期・ストレージ定数
@@ -1460,7 +1460,7 @@
           const lsUrl = localStorage.getItem(STORAGE_KEYS.URL);
           if (lsUrl && lsUrl.trim()) return lsUrl.trim();
         } catch (e) {}
-        return String(DEFAULT_PUBLISHED_CSV_URL || '').trim();
+        return String(DEFAULT_PUBLISHED_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv').trim();
       }
 
       function cleanupLegacyStorageKeys() {
