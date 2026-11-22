@@ -2,12 +2,12 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <!-- 意図しないピンチズームやダブルタップ拡大を防止し、現場での誤操作を防ぐ設定 -->
+  <!-- 現場での誤操作・意図しないピンチ拡大を防ぐビューポート設定 -->
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>積雪期 水利・消火栓探索＆点検位置修正ツール</title>
-  <!-- Tailwind CSS CDN -->
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Leaflet.js CSS & JS CDN (通信圏外でもレーダー・ARは動作するようフォールバック対応) -->
+  <!-- Leaflet.js -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <!-- Google Fonts: Inter & Noto Sans JP -->
@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
 
   <style>
-    /* 基本リセットとタッチ操作の最適化 */
+    /* 基本リセットとタッチ操作最適化 */
     * {
       box-sizing: border-box;
       -webkit-tap-highlight-color: transparent;
@@ -35,7 +35,7 @@
       user-select: none;
     }
 
-    /* 手袋操作を想定した大型ボタン共通スタイル */
+    /* 手袋操作を想定した大型ボタン */
     .glove-btn {
       min-height: 54px;
       border-radius: 14px;
@@ -49,7 +49,7 @@
       transform: scale(0.97);
     }
 
-    /* カスタムスクロールバー */
+    /* スクロールバー */
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -62,12 +62,12 @@
       border-radius: 3px;
     }
 
-    /* 数値の等幅表示 */
+    /* 等幅数字 */
     .tabular-nums {
       font-variant-numeric: tabular-nums;
     }
 
-    /* Leaflet 地図コンテナとヘディングアップ回転用ラッパー */
+    /* 地図コンテナ＆ヘディングアップ回転ラッパー */
     #map-wrapper {
       position: relative;
       width: 100%;
@@ -99,7 +99,7 @@
       color: #38bdf8 !important;
     }
 
-    /* Leaflet ポップアップのダークテーマ化 */
+    /* ダークテーマ ポップアップ */
     .leaflet-popup-content-wrapper {
       background: #151c2c !important;
       color: #f8fafc !important;
@@ -110,7 +110,7 @@
     }
     .leaflet-popup-content {
       margin: 10px 12px !important;
-      min-width: 210px;
+      min-width: 215px;
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
     }
     .leaflet-popup-tip {
@@ -123,7 +123,7 @@
       padding: 6px 8px !important;
     }
 
-    /* ターゲット水利のパルスアニメーション */
+    /* 選択中ターゲットのパルスアニメーション */
     @keyframes targetPulse {
       0% { transform: scale(0.96); box-shadow: 0 0 0 0 rgba(250, 204, 21, 0.9); }
       70% { transform: scale(1.06); box-shadow: 0 0 0 14px rgba(250, 204, 21, 0); }
@@ -137,7 +137,7 @@
 <body class="flex flex-col h-dvh overflow-hidden bg-[#0b0f19]">
 
   <!-- =====================================================================
-       1. 上部：測位ステータスバー＆フィルタバー＆3モード切替タブ
+       1. 上部：測位ステータスバー・フィルタバー・3モード切替タブ
   ====================================================================== -->
   <header class="bg-[#151c2c] border-b border-slate-700/80 px-3 pt-2 pb-2 shrink-0 z-30 shadow-lg">
     <div class="flex items-center justify-between gap-2">
@@ -153,7 +153,7 @@
         </span>
       </div>
 
-      <!-- 右上コントロール：画面スリープ防止 & デモモード切替 -->
+      <!-- 画面点灯維持 & デモモード -->
       <div class="flex items-center gap-1.5 shrink-0">
         <button id="btn-wakelock" type="button" class="px-2.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-[11px] font-bold text-slate-300 flex items-center gap-1 active:scale-95" title="画面消灯防止">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -178,7 +178,7 @@
       </div>
     </div>
 
-    <!-- ワンタップ種別フィルタ（すべて / 地下式のみ / 地上式のみ / 修正済のみ）＆ 市町村フィルタ -->
+    <!-- ワンタップ種別フィルタ ＆ 市町村フィルタ -->
     <div class="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
       <div id="type-filter-chips" class="flex items-center gap-1 shrink-0">
         <button type="button" data-type-filter="all" class="px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-sky-500 text-slate-950 transition-colors">すべて</button>
@@ -219,7 +219,7 @@
   ====================================================================== -->
   <main class="relative flex-1 flex flex-col items-center justify-center overflow-hidden bg-[#0b0f19]">
 
-    <!-- 共通：ターゲット距離・方位の大型HUDバッジ（通常モード時のみ表示） -->
+    <!-- ターゲット距離・方位HUD -->
     <div id="hud-distance-card" class="absolute top-3 left-3 bg-slate-950/90 border border-slate-700/90 backdrop-blur-md px-3.5 py-2 rounded-2xl pointer-events-none shadow-xl z-20">
       <div class="flex items-center gap-1.5">
         <span class="text-[10px] font-bold text-slate-400">ターゲットまで</span>
@@ -236,9 +236,7 @@
       </div>
     </div>
 
-    <!-- -------------------------------------------------------------------
-         [VIEW A] インタラクティブ地図モード (Leaflet.js + 国土地理院タイル)
-    -------------------------------------------------------------------- -->
+    <!-- [VIEW A] インタラクティブ地図モード -->
     <div id="view-map" class="relative w-full h-full z-10">
       <div id="map-wrapper">
         <div id="leaflet-map-rotator">
@@ -246,7 +244,7 @@
         </div>
       </div>
 
-      <!-- 位置修正モード中の上部操作バナー（ドラッグ＆地図タップ移動・GPS反映・確定） -->
+      <!-- 位置修正モード中の上部操作バナー -->
       <div id="relocate-banner" class="hidden absolute top-2.5 left-2.5 right-2.5 z-30 bg-amber-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md">
         <div class="flex items-center justify-between gap-2">
           <div class="min-w-0">
@@ -276,7 +274,7 @@
         </div>
       </div>
 
-      <!-- オフライン／Leaflet未ロード時のフォールバック案内 -->
+      <!-- 地図タイル読み込み不可時フォールバック -->
       <div id="map-offline-fallback" class="hidden absolute inset-0 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center z-30">
         <div class="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3">
           <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -290,9 +288,8 @@
         </button>
       </div>
 
-      <!-- 地図モード用コントロール（右上：表示範囲内件数バッジ・背景レイヤー切替・住所/地番表示切替・追従・ヘディングアップ） -->
+      <!-- 右上コントロール：表示範囲件数バッジ・背景切替・住所/地番ラベル切替・追従・ヘディングアップ -->
       <div id="map-right-controls" class="absolute top-3 right-3 flex flex-col items-end gap-1.5 z-20">
-        <!-- 表示範囲内の件数バッジ -->
         <div id="map-viewport-count-badge" class="px-3 py-1.5 rounded-2xl bg-slate-950/90 border border-slate-600 text-[11px] font-black text-emerald-300 shadow-lg tabular-nums pointer-events-none">
           表示: 0 / 範囲内0件 (全0件)
         </div>
@@ -317,16 +314,14 @@
         </button>
       </div>
 
-      <!-- 地図右下：拡大縮小ボタン（手袋で押しやすい大型ボタン） -->
+      <!-- 地図右下：ズームボタン -->
       <div class="absolute bottom-3 right-3 flex flex-col gap-2 z-20">
         <button id="btn-map-zoom-in" type="button" class="w-12 h-12 rounded-2xl bg-slate-950/90 border border-slate-600 text-xl font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
         <button id="btn-map-zoom-out" type="button" class="w-12 h-12 rounded-2xl bg-slate-950/90 border border-slate-600 text-xl font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
       </div>
     </div>
 
-    <!-- -------------------------------------------------------------------
-         [VIEW B] 2Dレーダーモード（オフライン完全対応）
-    -------------------------------------------------------------------- -->
+    <!-- [VIEW B] 2Dレーダーモード -->
     <div id="view-radar" class="hidden relative w-full h-full flex items-center justify-center p-2 z-10">
       <canvas id="radar-canvas" class="w-full h-full max-w-[440px] max-h-[440px]"></canvas>
 
@@ -343,9 +338,7 @@
       </div>
     </div>
 
-    <!-- -------------------------------------------------------------------
-         [VIEW C] 簡易ARカメラモード
-    -------------------------------------------------------------------- -->
+    <!-- [VIEW C] 簡易ARカメラモード -->
     <div id="view-ar" class="hidden relative w-full h-full z-10">
       <video id="ar-video" autoplay playsinline muted class="w-full h-full object-cover opacity-80"></video>
 
@@ -374,9 +367,7 @@
       </div>
     </div>
 
-    <!-- -------------------------------------------------------------------
-         デモ移動操作パッド（デモモードON時のみ画面左下にフローティング表示）
-    -------------------------------------------------------------------- -->
+    <!-- デモ移動操作パッド -->
     <div id="demo-controls" class="hidden absolute bottom-3 left-3 z-30 bg-slate-950/95 border border-sky-500/60 p-2.5 rounded-2xl shadow-2xl">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1.5">仮想移動・回転テスト</div>
       <div class="grid grid-cols-3 gap-1 w-36">
@@ -394,10 +385,9 @@
   </main>
 
   <!-- =====================================================================
-       3. 下部：ターゲット詳細・ストリートビュー・位置修正カード＆大型フッターボタン
+       3. 下部：ターゲット詳細・ストリートビュー・位置修正カード＆大型ボタン
   ====================================================================== -->
   <footer class="bg-[#151c2c] border-t border-slate-700/80 px-3 pt-2.5 pb-3 shrink-0 z-30 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
-    <!-- 選択中の水利情報＆位置修正・ストリートビューカード -->
     <div class="bg-slate-900/95 border border-slate-700 rounded-2xl p-2.5 mb-2">
       <div class="flex items-start justify-between gap-2">
         <div class="min-w-0 flex-1">
@@ -424,7 +414,7 @@
         </div>
       </div>
 
-      <!-- アクション行：ストリートビュー確認 / 地図で位置修正 / 詳細・メモ編集 -->
+      <!-- ストリートビュー / 地図で位置修正 / 数値・メモ編集 -->
       <div class="mt-2 grid grid-cols-3 gap-1.5">
         <a id="btn-open-sv" href="#" target="_blank" rel="noopener noreferrer" class="py-2 px-2 rounded-xl bg-emerald-600/25 border border-emerald-400/70 text-[11px] sm:text-xs font-black text-emerald-300 flex items-center justify-center gap-1 active:scale-95">
           <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -448,7 +438,7 @@
         </button>
       </div>
 
-      <!-- 位置メモ・目印（雪下の鉄蓋特定用） -->
+      <!-- 位置メモ・目印 -->
       <div class="mt-2 bg-amber-500/10 border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="text-[10px] font-bold text-amber-300">位置メモ・目印（除雪目安）</div>
@@ -456,14 +446,13 @@
             --
           </div>
         </div>
-        <!-- 修正済みの場合のみワンタップTSVコピーボタンを表示 -->
         <button id="btn-copy-modified-row" type="button" class="hidden shrink-0 px-2.5 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
           修正行コピー
         </button>
       </div>
     </div>
 
-    <!-- 手袋対応・大型操作ボタン群 -->
+    <!-- 手袋対応大型操作ボタン群 -->
     <div class="grid grid-cols-3 gap-2">
       <button id="btn-start-sensors" type="button" class="glove-btn bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm px-1.5 shadow-lg shadow-sky-500/20">
         <svg class="w-4 h-4 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -508,7 +497,6 @@
         </div>
       </div>
 
-      <!-- 検索フィルター＆地図表示範囲絞り込み -->
       <div class="p-3 border-b border-slate-800 bg-slate-900/50 space-y-2">
         <input id="search-hydrant" type="text" placeholder="住所・番号・目印・グリッド・地上/地下で検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-slate-900 border border-slate-700 text-white text-sm focus:outline-none focus:border-sky-400">
         <div class="flex items-center justify-between gap-2">
@@ -518,7 +506,6 @@
           </label>
           <span id="list-total-db-count" class="text-[11px] text-slate-400 tabular-nums">全登録: 0件</span>
         </div>
-        <!-- 修正済みデータがある場合のクイックコピーバー -->
         <div id="list-modified-bar" class="hidden flex items-center justify-between bg-amber-500/15 border border-amber-400/50 px-3 py-2 rounded-xl">
           <span id="list-modified-count-text" class="text-xs font-bold text-amber-300">修正済: 0件</span>
           <button id="btn-copy-all-modified" type="button" class="px-3 py-1.5 rounded-lg bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
@@ -527,10 +514,7 @@
         </div>
       </div>
 
-      <!-- リスト本体 -->
-      <div id="hydrant-list-container" class="flex-1 overflow-y-auto p-3 space-y-2.5">
-        <!-- JSで動的生成 -->
-      </div>
+      <div id="hydrant-list-container" class="flex-1 overflow-y-auto p-3 space-y-2.5"></div>
     </div>
   </div>
 
@@ -546,7 +530,6 @@
         </button>
       </div>
 
-      <!-- サブタブ切替：シート読込 / 新規・編集 / 出力・列設定 -->
       <div class="grid grid-cols-3 gap-1 bg-slate-950 p-1.5 border-b border-slate-800">
         <button type="button" id="subtab-import" class="py-2 rounded-lg text-xs font-black bg-amber-400 text-slate-950">シート読込</button>
         <button type="button" id="subtab-form" class="py-2 rounded-lg text-xs font-bold text-slate-300">新規/編集</button>
@@ -554,7 +537,7 @@
       </div>
 
       <div class="p-3.5 space-y-4 overflow-y-auto max-h-[78vh]">
-        <!-- [SUBTAB 1] スプレッドシート連携（URL / 貼り付け / ファイル） -->
+        <!-- [SUBTAB 1] スプレッドシート連携 -->
         <div id="panel-import" class="space-y-4">
           <div class="flex items-center justify-between bg-slate-900 border border-slate-700 px-3 py-2 rounded-xl">
             <span class="text-xs font-bold text-slate-300">取り込み方法</span>
@@ -570,7 +553,6 @@
             </div>
           </div>
 
-          <!-- ① 公開CSV URL / GAS WebアプリURL -->
           <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-sky-400">① 公開CSV / GAS WebアプリURLから取得</div>
             <input id="input-sheet-url" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv または GAS URL" class="w-full px-3 py-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs focus:outline-none focus:border-sky-400">
@@ -582,7 +564,6 @@
             </p>
           </div>
 
-          <!-- ② CSV / TSV テキスト貼り付け -->
           <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-amber-300">② スプレッドシートの行をコピーして貼り付け</div>
             <textarea id="textarea-paste-csv" rows="4" placeholder="スプレッドシートで範囲選択→コピーした内容（タブ区切り・カンマ区切り）をここに貼り付けてください..." class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs font-mono focus:outline-none focus:border-amber-400"></textarea>
@@ -591,7 +572,6 @@
             </button>
           </div>
 
-          <!-- ③ CSV / TSV / JSON ファイル読込 -->
           <div class="bg-slate-900/90 border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="flex items-center justify-between">
               <span class="text-xs font-black text-emerald-400">③ ファイルから読み込み（CSV / TSV / JSON）</span>
@@ -664,7 +644,6 @@
               </div>
             </div>
 
-            <!-- 座標入力＆現在地反映ボタン -->
             <div class="bg-slate-900/80 border border-slate-700 p-2.5 rounded-xl space-y-2">
               <div class="flex items-center justify-between">
                 <span class="text-xs font-bold text-sky-400">2-3: 座標（世界測地系 WGS84）</span>
@@ -739,9 +718,7 @@
               <input id="chk-skip-header" type="checkbox" checked class="accent-sky-400">
               1行目がヘッダー（文字）の場合は自動スキップ
             </label>
-            <div id="colmap-grid" class="grid grid-cols-2 gap-2 text-xs">
-              <!-- JSで列番号入力欄を生成 -->
-            </div>
+            <div id="colmap-grid" class="grid grid-cols-2 gap-2 text-xs"></div>
             <button id="btn-save-colmap" type="button" class="w-full py-2.5 rounded-xl bg-sky-500/20 border border-sky-400 text-sky-300 font-bold text-xs">
               列マッピング設定を保存
             </button>
@@ -755,24 +732,13 @@
     </div>
   </div>
 
-  <!-- カスタムトースト通知 -->
+  <!-- トースト通知 -->
   <div id="toast-container" class="fixed top-32 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-[90%] max-w-sm"></div>
 
   <!-- =====================================================================
-       アプリケーションロジック (Vanilla JS + Leaflet.js + L.layerGroup 高速描画)
+       アプリケーションロジック
   ====================================================================== -->
   <script>
-    /**
-     * 積雪期 水利・消火栓探索＆点検位置修正ツール
-     * - 約4,000件データでも高速動作する L.layerGroup 一括再描画と表示範囲（Bounds）連動
-     * - 地図の移動・ズーム（moveend / zoomend / resize）に連動して現在表示範囲内の消火栓を切替
-     * - 範囲内の該当件数が100件超の場合は地図中心から近い順に最大100件を抽出（選択中ターゲットは常時保持）
-     * - 地上式・地下式識別マーカー＆「1. 住所・地番」優先常時ラベル表示
-     */
-
-    // =========================================================================
-    // 1. 初期サンプルデータ・定数定義
-    // =========================================================================
     const MAX_DISPLAY_ITEMS = 100;
     const LABEL_MIN_ZOOM = 15;
 
@@ -902,16 +868,13 @@
     ];
 
     const STORAGE_KEYS = {
-      DATA: 'snow_hydrant_finder_data_v5',
-      COLMAP: 'snow_hydrant_finder_colmap_v5',
-      FILTER: 'snow_hydrant_finder_filter_v5',
-      URL: 'snow_hydrant_finder_sheet_url_v5',
-      LABELS: 'snow_hydrant_finder_labels_v5'
+      DATA: 'snow_hydrant_finder_data_v6',
+      COLMAP: 'snow_hydrant_finder_colmap_v6',
+      FILTER: 'snow_hydrant_finder_filter_v6',
+      URL: 'snow_hydrant_finder_sheet_url_v6',
+      LABELS: 'snow_hydrant_finder_labels_v6'
     };
 
-    // =========================================================================
-    // 2. アプリケーション状態管理
-    // =========================================================================
     const state = {
       hydrants: [],
       selectedId: null,
@@ -962,9 +925,6 @@
       isReady: false
     };
 
-    // =========================================================================
-    // 3. DOM要素のキャッシュ
-    // =========================================================================
     const dom = {
       accuracyDot: document.getElementById('accuracy-dot'),
       accuracyLabel: document.getElementById('accuracy-label'),
@@ -1087,7 +1047,7 @@
     };
 
     // =========================================================================
-    // 4. 測地計算・URL生成・クリップボードユーティリティ
+    // 測地計算・ストリートビューURL・クリップボード
     // =========================================================================
     const GeoUtils = {
       toRad: (deg) => (deg * Math.PI) / 180,
@@ -1107,7 +1067,6 @@
         return R * c;
       },
 
-      /** 4,000件ソート用の高速二乗距離（緯度補正付き近似） */
       approxDistSq(lat1, lon1, lat2, lon2) {
         const cosLat = Math.cos(this.toRad(lat1));
         const dLat = lat2 - lat1;
@@ -1197,7 +1156,7 @@
     }
 
     // =========================================================================
-    // 5. スプレッドシート / CSV / TSV / JSON パーサー
+    // スプレッドシート / CSV / TSV / JSON パーサー
     // =========================================================================
     const SheetParser = {
       parseDelimitedText(text) {
@@ -1263,9 +1222,9 @@
           }
 
           const no = (cols[colMap.no] || '').trim();
-          const address = (cols[colMap.address] || '').trim() || (no ? `水利 No.${no}` : `水利 #${rowIdx + 1}`);
+          const address = (cols[colMap.address] || '').trim();
           const city = (cols[colMap.city] || '').trim();
-          const offset = (cols[colMap.offset] || '').trim() || '位置メモ未登録';
+          const offset = (cols[colMap.offset] || '').trim();
           const type = (cols[colMap.type] || '').trim() || '地下式';
           const scale = (cols[colMap.scale] || '').trim();
           const diameter = (cols[colMap.diameter] || '').trim();
@@ -1281,7 +1240,7 @@
             lat,
             lon,
             city,
-            offset,
+            offset: offset || '位置メモ未登録',
             type,
             scale,
             diameter,
@@ -1306,9 +1265,9 @@
           if (isNaN(lat) || isNaN(lon)) return;
 
           const no = String(item.no ?? item.number ?? item['番号'] ?? '').trim();
-          const address = String(item.address ?? item.name ?? item['住所・地番'] ?? item['住所'] ?? (no ? `水利 No.${no}` : `水利 #${idx + 1}`)).trim();
+          const address = String(item.address ?? item.name ?? item['住所・地番'] ?? item['住所'] ?? '').trim();
           const city = String(item.city ?? item['市町村'] ?? '').trim();
-          const offset = String(item.offset ?? item.memo ?? item['位置メモ'] ?? item['位置メモ・目印'] ?? '位置メモ未登録').trim();
+          const offset = String(item.offset ?? item.memo ?? item['位置メモ'] ?? item['位置メモ・目印'] ?? '').trim() || '位置メモ未登録';
           const type = String(item.type ?? item['種別'] ?? '地下式').trim();
           const scale = String(item.scale ?? item['規模・区分'] ?? item['規模'] ?? '').trim();
           const diameter = String(item.diameter ?? item['口径'] ?? '').trim();
@@ -1341,7 +1300,7 @@
     };
 
     // =========================================================================
-    // 6. トースト通知
+    // トースト通知
     // =========================================================================
     function showToast(message, type = 'info') {
       const el = document.createElement('div');
@@ -1362,7 +1321,7 @@
     }
 
     // =========================================================================
-    // 7. データ永続化（LocalStorage）＆ 表示範囲（Bounds）連動100件抽出
+    // 状態保存・復元＆表示範囲連動100件抽出
     // =========================================================================
     function loadAppState() {
       try {
@@ -1431,6 +1390,18 @@
       } catch (e) {}
     }
 
+    /** 1列目（住所・地番）を最優先で取得するヘルパー（番号のみへのフォールバックは避ける） */
+    function getPrimaryAddressLabel(h) {
+      if (!h) return '';
+      const addr = (h.address || '').trim();
+      if (addr) return addr;
+      const offset = (h.offset || '').trim();
+      if (offset && offset !== '位置メモ未登録') return offset;
+      const city = (h.city || '').trim();
+      if (city) return city;
+      return h.no ? `No.${h.no}` : '住所未登録';
+    }
+
     function getHydrantTypeCategory(typeStr) {
       const t = (typeStr || '').trim();
       if (t.includes('地下')) return 'underground';
@@ -1461,10 +1432,6 @@
       });
     }
 
-    /**
-     * 現在の地図表示領域（Bounds）内の消火栓を抽出し、地図中心に近い順に最大100件を返す。
-     * 約4,000件の配列に対しても数ミリ秒で完了する軽量な数値比較を使用。
-     */
     function getViewportDisplayHydrants() {
       const filtered = getFilteredHydrants();
       const totalFilteredCount = filtered.length;
@@ -1501,7 +1468,6 @@
             .map((entry) => entry.h);
         }
 
-        // 選択中のターゲットは画面外でも常にリストに含める
         if (state.selectedId && !displayList.some((h) => h.id === state.selectedId)) {
           const selectedObj = filtered.find((h) => h.id === state.selectedId);
           if (selectedObj) {
@@ -1520,7 +1486,6 @@
         };
       }
 
-      // 地図未初期化時のフォールバック
       const refLat = state.userPos.lat ?? DEFAULT_HYDRANTS[0].lat;
       const refLon = state.userPos.lon ?? DEFAULT_HYDRANTS[0].lon;
       const sorted = filtered
@@ -1648,7 +1613,7 @@
     }
 
     // =========================================================================
-    // 8. 地図上での直感的位置修正モード（ドラッグ・マップタップ・GPS反映）
+    // 地図上での直感的位置修正モード
     // =========================================================================
     function startRelocateMode(hydrantId) {
       const target = state.hydrants.find((h) => h.id === hydrantId) || getSelectedHydrant();
@@ -1676,7 +1641,7 @@
       mapCtx.map.closePopup();
       mapCtx.map.setView([target.lat, target.lon], Math.max(mapCtx.map.getZoom(), 18), { animate: true });
 
-      dom.relocateTargetLabel.textContent = `${target.address}${target.no ? ` (No.${target.no})` : ''}`;
+      dom.relocateTargetLabel.textContent = getPrimaryAddressLabel(target);
       dom.relocateBanner.classList.remove('hidden');
       dom.hudDistanceCard.classList.add('hidden');
       dom.mapRightControls.classList.add('hidden');
@@ -1731,7 +1696,7 @@
     }
 
     // =========================================================================
-    // 9. Leaflet.js インタラクティブ地図の初期化と L.layerGroup 高速再描画
+    // Leaflet.js 地図初期化と「1. 住所・地番」優先マーカー＆常時ラベル描画
     // =========================================================================
     function initLeafletMap() {
       if (typeof L === 'undefined') {
@@ -1799,7 +1764,6 @@
         }
       });
 
-      // 移動・パン・ズーム完了のたびに表示範囲内の消火栓を確実に再描画
       const onViewportChange = () => {
         if (!mapCtx.isReady) return;
         renderMapMarkers();
@@ -1820,14 +1784,16 @@
     }
 
     /**
-     * 地上式・地下式の視覚的区別＋常時ラベル（No.[番号] [1.住所・地番] (地下/地上)）付きアイコン生成
+     * 地上式（レッド系・丸ピラー風）と地下式（シアン系・四角マンホール風）を色・形状で区別し、
+     * ピン内および常時ラベルに「1. 住所・地番（address）」を最優先表示する。
      */
     function buildHydrantDivIcon(h, isSelected, renderTextLabel) {
       const cat = getHydrantTypeCategory(h.type);
       const isUnderground = cat === 'underground';
       const isAboveground = cat === 'aboveground';
 
-      const shapeClass = isUnderground ? 'rounded-lg' : 'rounded-full';
+      // 地下式：四角マンホール風（シアン系）、地上式：丸ピラー風（レッド系）
+      const shapeClass = isUnderground ? 'rounded-md' : 'rounded-full';
       const bgClass = isUnderground
         ? 'bg-cyan-500 text-slate-950'
         : isAboveground
@@ -1841,10 +1807,9 @@
         : 'border-2 border-white';
 
       const typeShort = isUnderground ? '地下' : isAboveground ? '地上' : (h.type || '水').slice(0, 2);
-      const primaryAddr = (h.address || h.offset || (h.no ? `No.${h.no}` : typeShort)).trim();
-      const shortAddr = primaryAddr.length > 14 ? primaryAddr.slice(0, 13) + '…' : primaryAddr;
-      const pinText = h.no ? (h.no.length > 5 ? h.no.slice(0, 4) + '…' : h.no) : typeShort;
-      const labelTitle = `${h.no ? `No.${h.no} ` : ''}${shortAddr} (${typeShort})`;
+      const primaryAddr = getPrimaryAddressLabel(h);
+      const pinText = primaryAddr.length > 9 ? primaryAddr.slice(0, 8) + '…' : primaryAddr;
+      const labelTitle = `${primaryAddr} (${typeShort})`;
 
       const labelHtml = renderTextLabel
         ? `<div class="mt-1 px-1.5 py-0.5 rounded-md bg-slate-950/90 border ${
@@ -1860,7 +1825,7 @@
 
       const html = `
         <div class="flex flex-col items-center" style="transform: translate(-50%, -18px); width: max-content;">
-          <div class="relative flex items-center justify-center min-w-[34px] h-[32px] px-1.5 ${shapeClass} ${bgClass} ${borderClass} shadow-lg font-black text-[11px] tabular-nums">
+          <div class="relative flex items-center justify-center min-w-[38px] h-[30px] px-2 ${shapeClass} ${bgClass} ${borderClass} shadow-lg font-black text-[11px] leading-none">
             ${escapeHtml(pinText)}
             ${modifiedDot}
           </div>
@@ -1903,7 +1868,7 @@
             ${h.modified ? '<span class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 font-black text-[10px]">修正済</span>' : ''}
           </div>
           <div>
-            <div class="text-xs font-black text-white leading-snug">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(h.address)}</div>
+            <div class="text-xs font-black text-white leading-snug">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(getPrimaryAddressLabel(h))}</div>
             <div class="text-[11px] text-amber-300 font-bold mt-0.5">${escapeHtml(h.offset)}</div>
             ${specParts.length > 0 ? `<div class="text-[10px] text-slate-400 mt-0.5">${escapeHtml(specParts.join(' / '))}</div>` : ''}
           </div>
@@ -1923,9 +1888,6 @@
       startRelocateMode(hydrantId);
     };
 
-    /**
-     * L.layerGroup を用いて表示範囲（Bounds）内の消火栓マーカー・ラベルを一括再描画
-     */
     function renderMapMarkers() {
       if (!mapCtx.isReady || !mapCtx.map || !mapCtx.markersLayerGroup || !mapCtx.relocateLayerGroup) return;
 
@@ -2101,7 +2063,7 @@
     }
 
     // =========================================================================
-    // 10. 3モード切替（地図 / レーダー / 簡易AR）
+    // 3モード切替（地図 / レーダー / 簡易AR）
     // =========================================================================
     async function switchViewMode(mode) {
       if (state.viewMode === mode) return;
@@ -2166,7 +2128,7 @@
     }
 
     // =========================================================================
-    // 11. GPS測位 & 電子コンパス制御
+    // GPS & 電子コンパス制御
     // =========================================================================
     async function startSensors() {
       if (
@@ -2251,7 +2213,7 @@
     }
 
     // =========================================================================
-    // 12. 最寄り水利の自動検索
+    // 最寄り水利の自動検索
     // =========================================================================
     function selectNearestHydrant(silent = false) {
       const candidates = getFilteredHydrants();
@@ -2290,13 +2252,13 @@
         }
         updateUI();
         if (!silent) {
-          showToast(`最寄り選択: ${nearest.address} (${exactDist.toFixed(0)}m)`, 'success');
+          showToast(`最寄り選択: ${getPrimaryAddressLabel(nearest)} (${exactDist.toFixed(0)}m)`, 'success');
         }
       }
     }
 
     // =========================================================================
-    // 13. 2Dレーダー描画ロジック（Canvas・地上/地下色分け・最大100件対応）
+    // 2Dレーダー描画
     // =========================================================================
     function drawRadar() {
       const canvas = dom.radarCanvas;
@@ -2470,7 +2432,7 @@
     }
 
     // =========================================================================
-    // 14. UI全体の更新処理
+    // UI更新
     // =========================================================================
     function updateUI() {
       syncFilterChipsUI();
@@ -2547,7 +2509,7 @@
         }
 
         const cityPrefix = target.city ? `${target.city} ` : '';
-        dom.hydrantName.textContent = `${cityPrefix}${target.address}`;
+        dom.hydrantName.textContent = `${cityPrefix}${getPrimaryAddressLabel(target)}`;
 
         const memoText =
           target.note && target.note !== '-'
@@ -2597,7 +2559,7 @@
     }
 
     // =========================================================================
-    // 15. 画面スリープ防止 & デモ移動モード
+    // 画面スリープ防止 & デモ移動
     // =========================================================================
     async function toggleWakeLock() {
       if (!('wakeLock' in navigator)) {
@@ -2687,7 +2649,7 @@
     }
 
     // =========================================================================
-    // 16. モーダル制御（一覧表示・データ読込・単体編集・出力・列マッピング）
+    // モーダル制御（一覧・読込・単体編集・出力・列設定）
     // =========================================================================
     function renderHydrantList(keyword = '') {
       const container = dom.hydrantListContainer;
@@ -2799,6 +2761,7 @@
           ? `<span class="text-[10px] text-indigo-300 font-bold ml-1">[${escapeHtml(h.grid)}]</span>`
           : '';
         const specText = [h.diameter ? `φ${h.diameter}` : '', h.sign || ''].filter(Boolean).join(' / ');
+        const displayTitle = getPrimaryAddressLabel(h);
 
         card.innerHTML = `
           <div class="flex items-center justify-between gap-2">
@@ -2810,7 +2773,7 @@
             </div>
             <span class="text-base font-black text-sky-400 tabular-nums shrink-0">${distText}</span>
           </div>
-          <div class="text-sm sm:text-base font-black text-white mt-1">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(h.address)}</div>
+          <div class="text-sm sm:text-base font-black text-white mt-1">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(displayTitle)}</div>
           <div class="text-xs text-amber-300 mt-1 line-clamp-1">目印: ${escapeHtml(h.offset)}</div>
         `;
 
@@ -2823,7 +2786,7 @@
             mapCtx.map.setView([h.lat, h.lon], 17);
           }
           updateUI();
-          showToast(`「${h.address}」を選択しました`, 'success');
+          showToast(`「${displayTitle}」を選択しました`, 'success');
         });
 
         container.appendChild(card);
@@ -2901,7 +2864,7 @@
     }
 
     // =========================================================================
-    // 17. イベントリスナー登録 & 初期化
+    // イベント登録＆起動
     // =========================================================================
     function bindEvents() {
       dom.btnStartSensors.addEventListener('click', startSensors);
@@ -3038,7 +3001,7 @@
         const tsv = formatHydrantsToSheetTsv([current]);
         copyTextToClipboard(
           tsv,
-          `${current.address} の13列データをコピーしました（スプレッドシートへ貼付可）`
+          `${getPrimaryAddressLabel(current)} の13列データをコピーしました（スプレッドシートへ貼付可）`
         );
       });
 
