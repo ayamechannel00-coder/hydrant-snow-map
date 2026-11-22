@@ -98,6 +98,9 @@
     .map-relocate-ui {
       z-index: 1150;
     }
+    .ar-overlay-ui {
+      z-index: 2200;
+    }
     .app-modal {
       z-index: 2500;
     }
@@ -160,7 +163,7 @@
     }
   </style>
 </head>
-<body class="flex flex-col h-dvh overflow-hidden bg-[#0b101b] text-slate-100">
+<body class="flex flex-col h-dvh overflow-hidden bg-[#0b101b] text-slate-100" lang="ja">
 
   <!-- Top Header -->
   <header class="app-header ui-lock-zoom bg-[#111827] border-b border-slate-800 px-3 pt-2 pb-2 shrink-0 shadow-lg">
@@ -196,6 +199,16 @@
       <div class="tabular-nums shrink-0 ml-2">
         方位: <span id="heading-display" class="text-sky-400 font-bold">--°</span>
       </div>
+    </div>
+
+    <!-- High Storage Warning Banner (shown only above ~75% of ~4.5MB budget) -->
+    <div id="storage-warning-banner" class="hidden mt-1.5 bg-amber-950/95 border border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
+      <div class="text-amber-200 font-bold truncate">
+        保存容量使用率 <span id="storage-warn-pct" class="font-black text-amber-300 tabular-nums">--%</span>。キャッシュ整理を推奨します
+      </div>
+      <button id="btn-banner-cleanup" type="button" class="shrink-0 px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px] active:scale-95">
+        キャッシュ整理
+      </button>
     </div>
 
     <!-- Filter Chips & Municipality Selector -->
@@ -279,14 +292,8 @@
       </button>
     </div>
 
-    <!-- Bottom-Right Zoom Controls -->
-    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
-      <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
-      <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
-    </div>
-
     <!-- Bottom-Left Virtual Movement Pad (Demo Mode Only) -->
-    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-3 left-3 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl pointer-events-auto">
+    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-20 left-3 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
         <div></div>
@@ -299,6 +306,27 @@
         <button type="button" data-move="s" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">↓南</button>
         <div></div>
       </div>
+    </div>
+
+    <!-- Bottom-Center Large High-Visibility AR Button -->
+    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 left-3 right-16 flex items-center pointer-events-none">
+      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[260px] min-h-[54px] px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white/80 shadow-[0_10px_26px_rgba(0,0,0,0.85)] flex items-center justify-center gap-2 active:scale-95">
+        <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M4 7V5a2 2 0 0 1 2-2h2" />
+          <path d="M16 3h2a2 2 0 0 1 2 2v2" />
+          <path d="M20 17v2a2 2 0 0 1-2 2h-2" />
+          <path d="M8 21H6a2 2 0 0 1-2-2v-2" />
+          <circle cx="12" cy="12" r="3" />
+          <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
+        </svg>
+        <span>AR カメラ探索</span>
+      </button>
+    </div>
+
+    <!-- Bottom-Right Zoom Controls -->
+    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
+      <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
+      <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
     </div>
   </main>
 
@@ -352,6 +380,69 @@
       </button>
     </div>
   </footer>
+
+  <!-- Full-Screen AR Camera Overlay -->
+  <div id="ar-overlay" class="ar-overlay-ui ui-lock-zoom hidden fixed inset-0 bg-[#050811] flex flex-col justify-between overflow-hidden">
+    <video id="ar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover opacity-85"></video>
+    <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#0b101b] to-[#050811] pointer-events-none"></div>
+
+    <!-- Center Sightline -->
+    <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <div class="w-0.5 h-full bg-amber-400/25"></div>
+      <div class="w-12 h-12 rounded-full border-2 border-amber-300/60 flex items-center justify-center">
+        <div class="w-2 h-2 rounded-full bg-amber-300"></div>
+      </div>
+    </div>
+
+    <!-- AR Callout Layer -->
+    <div id="ar-targets-layer" class="pointer-events-none absolute inset-x-0 top-24 bottom-40 overflow-hidden"></div>
+
+    <!-- Top AR Bar -->
+    <div class="relative z-10 p-3 bg-gradient-to-b from-[#0b101b]/95 to-transparent flex items-center justify-between gap-2">
+      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl px-3 py-2">
+        <div class="flex items-center gap-2">
+          <span class="text-xs font-black text-amber-300">AR探索</span>
+          <span id="ar-heading-readout" class="text-xs font-black text-sky-300 tabular-nums">方位 0°</span>
+        </div>
+        <div id="ar-camera-status" class="text-[11px] text-slate-300 mt-0.5 truncate max-w-[220px]">
+          現在地基準で周辺水利を表示中
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="btn-ar-compass-perm" type="button" class="px-3 py-2.5 rounded-2xl bg-sky-500 text-slate-950 text-xs font-black shadow-lg active:scale-95">
+          方位許可
+        </button>
+        <button id="btn-close-ar" type="button" class="px-3.5 py-2.5 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-black text-white shadow-lg active:scale-95">
+          閉じる
+        </button>
+      </div>
+    </div>
+
+    <!-- Bottom AR Heading Control & Selected Target Card -->
+    <div class="relative z-10 p-3 bg-gradient-to-t from-[#0b101b]/98 via-[#0b101b]/90 to-transparent space-y-2.5">
+      <div id="ar-selected-card" class="bg-[#111827]/95 border border-amber-400/60 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div id="ar-sel-meta" class="text-[11px] font-bold text-amber-300 tabular-nums">対象未選択</div>
+          <div id="ar-sel-addr" class="text-xs sm:text-sm font-black text-white truncate">付近の消火栓を選択してください</div>
+        </div>
+        <button id="btn-ar-select-map" type="button" class="shrink-0 px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
+          地図で確認
+        </button>
+      </div>
+
+      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl p-2.5 space-y-1.5">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-300">
+          <span>手動カメラ方角調整（センサー非対応・室内確認用）</span>
+          <span id="ar-slider-val" class="text-sky-400 font-black tabular-nums">0°</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="btn-ar-turn-left" type="button" class="px-3 py-2 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-black text-white active:scale-95">-15°</button>
+          <input id="ar-heading-slider" type="range" min="0" max="359" value="0" aria-label="カメラ方角スライダー" class="flex-1 accent-amber-400 h-6">
+          <button id="btn-ar-turn-right" type="button" class="px-3 py-2 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-black text-white active:scale-95">+15°</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- Modal 1: Nearby / Viewport List -->
   <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-3">
@@ -442,14 +533,28 @@
               <span id="last-sync-status" class="text-[10px] text-slate-400 tabular-nums">未同期</span>
             </div>
             <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
-            <div class="grid grid-cols-2 gap-2">
-              <button id="btn-save-url" type="button" class="py-2.5 px-3 rounded-xl bg-[#1e293b] border border-slate-600 text-slate-100 font-bold text-xs active:scale-95">
-                URLを保存
+            <div class="grid grid-cols-3 gap-1.5">
+              <button id="btn-save-url" type="button" class="py-2.5 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-slate-100 font-bold text-xs active:scale-95">
+                URL保存
               </button>
-              <button id="btn-fetch-csv" type="button" class="py-2.5 px-3 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
+              <button id="btn-reset-default-url" type="button" class="py-2.5 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-sky-300 font-bold text-xs active:scale-95">
+                既定URL戻し
+              </button>
+              <button id="btn-fetch-csv" type="button" class="py-2.5 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
                 今すぐ同期
               </button>
             </div>
+          </div>
+
+          <!-- Storage Budget & Cache Cleanup -->
+          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs font-black text-emerald-300">端末保存容量（4.5MB目安）</span>
+              <span id="storage-budget-detail" class="text-[11px] font-bold text-slate-300 tabular-nums">-- KB (--%)</span>
+            </div>
+            <button id="btn-cleanup-cache" type="button" class="w-full py-2.5 px-3 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-xs font-black text-emerald-300 active:scale-95">
+              不要キャッシュ整理（修正済みデータは保持）
+            </button>
           </div>
 
           <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
@@ -592,10 +697,10 @@
       // =====================================================================
       // 公開スプレッドシートCSV URL設定（必要に応じてここにURLを設定）
       // =====================================================================
-      const DEFAULT_PUBLISHED_CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
+      const DEFAULT_PUBLISHED_CSV_URL = '';
 
       // =====================================================================
-      // 描画・GPS・同期定数
+      // 描画・GPS・同期・ストレージ定数
       // =====================================================================
       const MAX_DISPLAY_ITEMS = 100;
       const GPS_MIN_INTERVAL_MS = 2000;
@@ -603,13 +708,26 @@
       const GPS_MAX_ACCURACY_M = 150.0;
       const VIEWPORT_DEBOUNCE_MS = 120;
       const COORD_MATCH_EPSILON = 1e-5;
+      const STORAGE_BUDGET_BYTES = 4.5 * 1024 * 1024;
+      const STORAGE_WARN_RATIO = 0.75;
 
       const STORAGE_KEYS = {
-        DATA: 'shibata_hydrant_finder_v3_data',
-        URL: 'shibata_hydrant_finder_v3_url',
-        AUTOPAN: 'shibata_hydrant_finder_v3_autopan',
-        LAST_SYNC: 'shibata_hydrant_finder_v3_last_sync'
+        DATA: 'shibata_hydrant_finder_v4_data',
+        URL: 'shibata_hydrant_finder_v4_url',
+        AUTOPAN: 'shibata_hydrant_finder_v4_autopan',
+        LAST_SYNC: 'shibata_hydrant_finder_v4_last_sync'
       };
+
+      const LEGACY_STORAGE_KEYS = [
+        'shibata_hydrant_finder_v1_data',
+        'shibata_hydrant_finder_v2_data',
+        'shibata_hydrant_finder_v3_data',
+        'shibata_hydrant_finder_v3_url',
+        'shibata_hydrant_finder_v3_autopan',
+        'shibata_hydrant_finder_v3_last_sync',
+        'hydrant_finder_cache',
+        'hydrant_finder_backup'
+      ];
 
       const SAMPLE_SHIBATA_HYDRANTS = [
         {
@@ -646,7 +764,7 @@
           type: '地上式',
           scale: '大',
           diameter: '200',
-          remarks: '-',
+          remarks: '',
           sign: '丸板',
           grid: '4-D-4',
           svUrl: '',
@@ -667,7 +785,7 @@
           type: '地下式',
           scale: '大',
           diameter: '150',
-          remarks: '-',
+          remarks: '',
           sign: '電柱巻付',
           grid: '3-B-3',
           svUrl: '',
@@ -688,7 +806,7 @@
           type: '地上式',
           scale: '大',
           diameter: '200',
-          remarks: '-',
+          remarks: '',
           sign: '丸板ポール',
           grid: '4-C-4',
           svUrl: '',
@@ -730,7 +848,7 @@
           type: '地下式',
           scale: '大',
           diameter: '150',
-          remarks: '-',
+          remarks: '',
           sign: '丸板',
           grid: '5-B-4',
           svUrl: '',
@@ -764,6 +882,8 @@
           accuracy: null
         },
         heading: 0,
+        manualHeading: 0,
+        useManualHeading: false,
         tileIdx: 0,
         relocate: {
           active: false,
@@ -772,6 +892,10 @@
           origLon: 0,
           draftLat: 0,
           draftLon: 0
+        },
+        ar: {
+          active: false,
+          stream: null
         }
       };
 
@@ -805,6 +929,9 @@
         demoLabel: $('demo-label'),
         coordsDisplay: $('coords-display'),
         headingDisplay: $('heading-display'),
+        storageWarningBanner: $('storage-warning-banner'),
+        storageWarnPct: $('storage-warn-pct'),
+        btnBannerCleanup: $('btn-banner-cleanup'),
         filterChips: $('filter-chips'),
         citySelect: $('city-select'),
         targetHud: $('target-hud'),
@@ -826,6 +953,7 @@
         btnZoomIn: $('btn-zoom-in'),
         btnZoomOut: $('btn-zoom-out'),
         demoPad: $('demo-pad'),
+        btnOpenAr: $('btn-open-ar'),
         detailNo: $('detail-no'),
         detailType: $('detail-type'),
         detailSpec: $('detail-spec'),
@@ -841,6 +969,21 @@
         gpsBtnLabel: $('gps-btn-label'),
         btnNearest: $('btn-nearest'),
         btnOpenList: $('btn-open-list'),
+        arOverlay: $('ar-overlay'),
+        arVideo: $('ar-video'),
+        arNoCameraBg: $('ar-no-camera-bg'),
+        arTargetsLayer: $('ar-targets-layer'),
+        arHeadingReadout: $('ar-heading-readout'),
+        arCameraStatus: $('ar-camera-status'),
+        btnArCompassPerm: $('btn-ar-compass-perm'),
+        btnCloseAr: $('btn-close-ar'),
+        arSelMeta: $('ar-sel-meta'),
+        arSelAddr: $('ar-sel-addr'),
+        btnArSelectMap: $('btn-ar-select-map'),
+        arSliderVal: $('ar-slider-val'),
+        btnArTurnLeft: $('btn-ar-turn-left'),
+        arHeadingSlider: $('ar-heading-slider'),
+        btnArTurnRight: $('btn-ar-turn-right'),
         modalList: $('modal-list'),
         listSummary: $('list-summary'),
         btnOpenModifiedManager: $('btn-open-modified-manager'),
@@ -867,7 +1010,10 @@
         lastSyncStatus: $('last-sync-status'),
         csvUrlInput: $('csv-url-input'),
         btnSaveUrl: $('btn-save-url'),
+        btnResetDefaultUrl: $('btn-reset-default-url'),
         btnFetchCsv: $('btn-fetch-csv'),
+        storageBudgetDetail: $('storage-budget-detail'),
+        btnCleanupCache: $('btn-cleanup-cache'),
         pasteDataTextarea: $('paste-data-textarea'),
         btnImportPaste: $('btn-import-paste'),
         fileUploadInput: $('file-upload-input'),
@@ -1005,6 +1151,10 @@
         return 0;
       }
 
+      function getEffectiveHeading() {
+        return state.useManualHeading ? state.manualHeading : state.heading;
+      }
+
       function cleanTsvField(val) {
         return String(val ?? '').replace(/[\r\n\t]+/g, ' ').trim();
       }
@@ -1077,8 +1227,63 @@
       }
 
       // =====================================================================
-      // 13列 CSV / TSV パーサー・同期マージ・ストレージ管理
+      // 13列 CSV / TSV パーサー・同期マージ・軽量ストレージ管理
       // =====================================================================
+      function compactStr(val) {
+        return String(val ?? '').replace(/\s+/g, ' ').trim();
+      }
+
+      function compactHydrantRecord(h) {
+        const lat = Number(Number(h.lat).toFixed(6));
+        const lon = Number(Number(h.lon).toFixed(6));
+        const modified = Boolean(h.modified);
+
+        const rec = {
+          id: compactStr(h.id),
+          no: compactStr(h.no),
+          address: compactStr(h.address),
+          lat,
+          lon,
+          city: compactStr(h.city),
+          offset: compactStr(h.offset) || '位置メモ未登録',
+          type: compactStr(h.type) || '地下式'
+        };
+
+        const scale = compactStr(h.scale);
+        if (scale && scale !== '-') rec.scale = scale;
+
+        const diameter = compactStr(h.diameter);
+        if (diameter && diameter !== '-') rec.diameter = diameter;
+
+        const remarks = compactStr(h.remarks);
+        if (remarks && remarks !== '-') rec.remarks = remarks;
+
+        const sign = compactStr(h.sign);
+        if (sign && sign !== '-') rec.sign = sign;
+
+        const grid = compactStr(h.grid);
+        if (grid && grid !== '-') rec.grid = grid;
+
+        const svUrl = compactStr(h.svUrl);
+        if (svUrl) rec.svUrl = svUrl;
+
+        if (modified) {
+          rec.modified = true;
+          const oLat = typeof h.origLat === 'number' ? Number(h.origLat.toFixed(6)) : lat;
+          const oLon = typeof h.origLon === 'number' ? Number(h.origLon.toFixed(6)) : lon;
+          rec.origLat = oLat;
+          rec.origLon = oLon;
+          const modAt = compactStr(h.modifiedAt);
+          if (modAt) rec.modifiedAt = modAt;
+          const shift = getEffectiveShiftMeters({ ...h, lat, lon, origLat: oLat, origLon: oLon });
+          if (shift > 0) rec.shiftMeters = shift;
+        } else {
+          rec.modified = false;
+        }
+
+        return rec;
+      }
+
       function parseRowsFromText(rawText) {
         const normalized = String(rawText || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
         if (!normalized) return [];
@@ -1148,39 +1353,37 @@
           }
           if (Math.abs(lat) < 0.0001 && Math.abs(lon) < 0.0001) continue;
 
-          const no = String(cols[0] ?? '').trim();
-          const address = String(cols[1] ?? '').trim();
-          const city = String(cols[4] ?? '').trim();
-          const offset = String(cols[5] ?? '').trim() || '位置メモ未登録';
-          const type = String(cols[6] ?? '').trim() || '地下式';
-          const scale = String(cols[7] ?? '').trim();
-          const diameter = String(cols[8] ?? '').trim();
-          const remarks = String(cols[9] ?? '').trim();
-          const sign = String(cols[10] ?? '').trim();
-          const grid = String(cols[11] ?? '').trim();
-          const svUrl = String(cols[12] ?? '').trim();
+          const no = compactStr(cols[0]);
+          const address = compactStr(cols[1]);
+          const city = compactStr(cols[4]);
+          const offset = compactStr(cols[5]) || '位置メモ未登録';
+          const type = compactStr(cols[6]) || '地下式';
+          const scale = compactStr(cols[7]);
+          const diameter = compactStr(cols[8]);
+          const remarks = compactStr(cols[9]);
+          const sign = compactStr(cols[10]);
+          const grid = compactStr(cols[11]);
+          const svUrl = compactStr(cols[12]);
 
-          items.push({
-            id: no ? `h-${no}-${idx}` : `h-row-${idx}-${Date.now()}`,
-            no,
-            address,
-            lat,
-            lon,
-            origLat: lat,
-            origLon: lon,
-            city,
-            offset,
-            type,
-            scale,
-            diameter,
-            remarks,
-            sign,
-            grid,
-            svUrl,
-            modified: false,
-            modifiedAt: '',
-            shiftMeters: 0
-          });
+          items.push(
+            compactHydrantRecord({
+              id: no ? `h-${no}-${idx}` : `h-r-${idx}`,
+              no,
+              address,
+              lat,
+              lon,
+              city,
+              offset,
+              type,
+              scale,
+              diameter,
+              remarks,
+              sign,
+              grid,
+              svUrl,
+              modified: false
+            })
+          );
         }
         return items;
       }
@@ -1211,7 +1414,7 @@
             null;
 
           if (!match) {
-            return up;
+            return compactHydrantRecord(up);
           }
 
           if (match.modified) {
@@ -1220,18 +1423,14 @@
               Math.abs(Number(match.lon) - Number(up.lon)) <= COORD_MATCH_EPSILON;
 
             if (matchesUpstream) {
-              return {
+              return compactHydrantRecord({
                 ...up,
                 id: match.id,
-                origLat: up.lat,
-                origLon: up.lon,
-                modified: false,
-                modifiedAt: '',
-                shiftMeters: 0
-              };
+                modified: false
+              });
             }
 
-            return {
+            return compactHydrantRecord({
               ...up,
               id: match.id,
               lat: match.lat,
@@ -1240,44 +1439,88 @@
               origLon: up.lon,
               offset: match.offset || up.offset,
               modified: true,
-              modifiedAt: match.modifiedAt || '',
-              shiftMeters: Number(calcDistanceMeters(up.lat, up.lon, match.lat, match.lon).toFixed(1))
-            };
+              modifiedAt: match.modifiedAt || ''
+            });
           }
 
-          return {
+          return compactHydrantRecord({
             ...up,
             id: match.id,
-            origLat: up.lat,
-            origLon: up.lon,
-            modified: false,
-            modifiedAt: '',
-            shiftMeters: 0
-          };
+            modified: false
+          });
         });
       }
 
-      function getConfiguredCsvUrl() {
-        const stored = dom.csvUrlInput && String(dom.csvUrlInput.value || '').trim();
-        if (stored) return stored;
+      /** Single source of truth for resolving active published CSV URL */
+      function resolveActiveCsvUrl(overrideUrl) {
+        if (typeof overrideUrl === 'string' && overrideUrl.trim()) {
+          return overrideUrl.trim();
+        }
         try {
           const lsUrl = localStorage.getItem(STORAGE_KEYS.URL);
           if (lsUrl && lsUrl.trim()) return lsUrl.trim();
         } catch (e) {}
-        return String(DEFAULT_PUBLISHED_CSV_URL || 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv').trim();
+        return String(DEFAULT_PUBLISHED_CSV_URL || '').trim();
+      }
+
+      function cleanupLegacyStorageKeys() {
+        try {
+          for (let i = 0; i < LEGACY_STORAGE_KEYS.length; i++) {
+            localStorage.removeItem(LEGACY_STORAGE_KEYS[i]);
+          }
+        } catch (e) {}
+      }
+
+      function updateStorageBudgetUI(byteLength) {
+        const bytes = typeof byteLength === 'number' ? byteLength : JSON.stringify(state.hydrants).length;
+        const kb = (bytes / 1024).toFixed(1);
+        const pct = Math.min(999, Number(((bytes / STORAGE_BUDGET_BYTES) * 100).toFixed(1)));
+
+        if (dom.listStorageInfo) {
+          dom.listStorageInfo.textContent = `全${state.hydrants.length}件 (${kb}KB / ${pct}%)`;
+        }
+        if (dom.storageBudgetDetail) {
+          dom.storageBudgetDetail.textContent = `${kb}KB / 4,608KB (${pct}%)`;
+        }
+
+        const isHigh = pct >= STORAGE_WARN_RATIO * 100;
+        if (dom.storageWarningBanner) {
+          dom.storageWarningBanner.classList.toggle('hidden', !isHigh);
+        }
+        if (dom.storageWarnPct) {
+          dom.storageWarnPct.textContent = `${pct}%`;
+        }
       }
 
       function saveToStorage() {
+        state.hydrants = state.hydrants.map(compactHydrantRecord);
+        const payload = JSON.stringify(state.hydrants);
+        updateStorageBudgetUI(payload.length);
         try {
-          const payload = JSON.stringify(state.hydrants);
           localStorage.setItem(STORAGE_KEYS.DATA, payload);
-          const kb = (payload.length / 1024).toFixed(1);
-          if (dom.listStorageInfo) {
-            dom.listStorageInfo.textContent = `全${state.hydrants.length}件 (${kb}KB)`;
-          }
         } catch (err) {
-          showToast('端末保存容量の上限に近づいています。CSV出力もご活用ください', 'warn');
+          showToast('保存領域の空き不足です。「キャッシュ整理」をお試しください', 'warn');
         }
+      }
+
+      function cleanupCachePreservingModified() {
+        cleanupLegacyStorageKeys();
+        state.hydrants = state.hydrants.map(compactHydrantRecord);
+        const activeUrl = resolveActiveCsvUrl();
+        try {
+          localStorage.clear();
+          localStorage.setItem(STORAGE_KEYS.DATA, JSON.stringify(state.hydrants));
+          if (activeUrl) {
+            localStorage.setItem(STORAGE_KEYS.URL, activeUrl);
+          }
+          localStorage.setItem(STORAGE_KEYS.AUTOPAN, String(state.autoPanOnTrack));
+          if (state.lastSyncAt) {
+            localStorage.setItem(STORAGE_KEYS.LAST_SYNC, state.lastSyncAt);
+          }
+        } catch (e) {}
+        const bytes = JSON.stringify(state.hydrants).length;
+        updateStorageBudgetUI(bytes);
+        showToast(`不要キャッシュを整理しました（修正分保持・${(bytes / 1024).toFixed(1)}KB）`, 'success');
       }
 
       function updateLastSyncLabel(tsStr) {
@@ -1293,31 +1536,27 @@
       }
 
       function loadFromStorage() {
+        cleanupLegacyStorageKeys();
         let hasCachedData = false;
+        let payloadLen = 0;
+
         try {
           const raw = localStorage.getItem(STORAGE_KEYS.DATA);
           if (raw) {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              state.hydrants = parsed.map((h) => ({
-                ...h,
-                origLat: typeof h.origLat === 'number' ? h.origLat : h.lat,
-                origLon: typeof h.origLon === 'number' ? h.origLon : h.lon,
-                modified: Boolean(h.modified),
-                modifiedAt: h.modifiedAt || '',
-                shiftMeters: typeof h.shiftMeters === 'number' ? h.shiftMeters : 0
-              }));
-              hasCachedData = true;
-              const kb = (raw.length / 1024).toFixed(1);
-              if (dom.listStorageInfo) {
-                dom.listStorageInfo.textContent = `全${state.hydrants.length}件 (${kb}KB)`;
+              state.hydrants = parsed.map(compactHydrantRecord);
+              const compacted = JSON.stringify(state.hydrants);
+              payloadLen = compacted.length;
+              if (compacted !== raw) {
+                localStorage.setItem(STORAGE_KEYS.DATA, compacted);
               }
+              hasCachedData = true;
             }
           }
 
-          const savedUrl = localStorage.getItem(STORAGE_KEYS.URL);
-          const effectiveUrl = (savedUrl && savedUrl.trim()) || DEFAULT_PUBLISHED_CSV_URL;https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv
-          if (dom.csvUrlInput && effectiveUrl) {
+          const effectiveUrl = resolveActiveCsvUrl();
+          if (dom.csvUrlInput) {
             dom.csvUrlInput.value = effectiveUrl;
           }
 
@@ -1335,14 +1574,16 @@
         }
 
         if (!hasCachedData || !state.hydrants || state.hydrants.length === 0) {
-          state.hydrants = JSON.parse(JSON.stringify(SAMPLE_SHIBATA_HYDRANTS));
+          state.hydrants = SAMPLE_SHIBATA_HYDRANTS.map(compactHydrantRecord);
           saveToStorage();
+        } else {
+          updateStorageBudgetUI(payloadLen);
         }
         return hasCachedData;
       }
 
-      async function syncFromPublishedCsv({ silent = false, focusFirst = false } = {}) {
-        const url = getConfiguredCsvUrl();
+      async function syncFromPublishedCsv({ silent = false, focusFirst = false, urlOverride = '' } = {}) {
+        const url = resolveActiveCsvUrl(urlOverride);
         if (!url) {
           if (!silent) {
             showToast('公開CSV URLが未設定です。「読込/設定」タブでURLを入力してください', 'warn');
@@ -1388,6 +1629,7 @@
           updateGnssHeader();
           updateDetailAndHud();
           renderViewportMarkers();
+          if (state.ar.active) renderArOverlay();
 
           if (!silent) {
             showToast(`公開CSVと同期しました（${merged.length}件・修正分保護済）`, 'success');
@@ -1477,9 +1719,10 @@
         const west = bounds.getWest();
         const east = bounds.getEast();
 
+        const useGpsCenter = state.userPos.lat !== null && state.userPos.lon !== null;
         const center = mapRef.map.getCenter();
-        const refLat = center.lat;
-        const refLon = center.lng;
+        const refLat = useGpsCenter ? state.userPos.lat : center.lat;
+        const refLon = useGpsCenter ? state.userPos.lon : center.lng;
 
         const inside = [];
         for (let i = 0; i < filtered.length; i++) {
@@ -1809,6 +2052,7 @@
           });
         }
 
+        const activeHeading = getEffectiveHeading();
         if (state.userPos.lat !== null && state.userPos.lon !== null) {
           const uLatLng = [state.userPos.lat, state.userPos.lon];
           const acc = Math.max(2, Number(state.userPos.accuracy || 10));
@@ -1831,7 +2075,7 @@
             className: '',
             iconSize: [28, 28],
             iconAnchor: [14, 14],
-            html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;transform:rotate(${state.heading}deg);">
+            html: `<div style="width:28px;height:28px;display:flex;align-items:center;justify-content:center;transform:rotate(${activeHeading}deg);">
               <svg width="28" height="28" viewBox="0 0 28 28">
                 <path d="M14 2 L22 16 L14 13 L6 16 Z" fill="#38bdf8" />
                 <circle cx="14" cy="15" r="5" fill="#0284c7" stroke="#ffffff" stroke-width="2" />
@@ -1921,13 +2165,16 @@
             const origLon = typeof state.hydrants[idx].origLon === 'number' ? state.hydrants[idx].origLon : r.origLon;
             const totalShift = Number(calcDistanceMeters(origLat, origLon, nLat, nLon).toFixed(1));
 
-            state.hydrants[idx].origLat = origLat;
-            state.hydrants[idx].origLon = origLon;
-            state.hydrants[idx].lat = nLat;
-            state.hydrants[idx].lon = nLon;
-            state.hydrants[idx].modified = true;
-            state.hydrants[idx].modifiedAt = new Date().toLocaleString('ja-JP', { hour12: false });
-            state.hydrants[idx].shiftMeters = totalShift;
+            state.hydrants[idx] = compactHydrantRecord({
+              ...state.hydrants[idx],
+              origLat,
+              origLon,
+              lat: nLat,
+              lon: nLon,
+              modified: true,
+              modifiedAt: new Date().toLocaleString('ja-JP', { hour12: false }),
+              shiftMeters: totalShift
+            });
             saveToStorage();
             showToast(`位置を修正しました（累計移動 ${totalShift.toFixed(1)}m）`, 'success');
           }
@@ -1944,6 +2191,155 @@
         updateGnssHeader();
         updateDetailAndHud();
         renderViewportMarkers();
+      }
+
+      // =====================================================================
+      // AR カメラ＆方位センサーオーバーレイ
+      // =====================================================================
+      async function openArOverlay() {
+        const baseLat =
+          state.userPos.lat !== null ? state.userPos.lat : mapRef.map ? mapRef.map.getCenter().lat : SAMPLE_SHIBATA_HYDRANTS[0].lat;
+        const baseLon =
+          state.userPos.lon !== null ? state.userPos.lon : mapRef.map ? mapRef.map.getCenter().lng : SAMPLE_SHIBATA_HYDRANTS[0].lon;
+
+        if (state.userPos.lat === null || state.userPos.lon === null) {
+          state.userPos = { lat: baseLat, lon: baseLon, accuracy: 25 };
+          updateGnssHeader();
+        }
+
+        if (!state.useManualHeading) {
+          state.manualHeading = Math.round(state.heading);
+          if (dom.arHeadingSlider) dom.arHeadingSlider.value = String(state.manualHeading);
+          if (dom.arSliderVal) dom.arSliderVal.textContent = `${state.manualHeading}°`;
+        }
+
+        state.ar.active = true;
+        if (dom.arOverlay) dom.arOverlay.classList.remove('hidden');
+        if (dom.arCameraStatus) dom.arCameraStatus.textContent = '背面カメラを起動中...';
+
+        if (navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function') {
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' } },
+              audio: false
+            });
+            state.ar.stream = stream;
+            if (dom.arVideo) {
+              dom.arVideo.srcObject = stream;
+            }
+            if (dom.arNoCameraBg) dom.arNoCameraBg.classList.add('opacity-40');
+            if (dom.arCameraStatus) {
+              dom.arCameraStatus.textContent = state.useManualHeading
+                ? 'カメラ表示中（手動方角モード）'
+                : 'カメラ表示中（方位センサー連動）';
+            }
+          } catch (err) {
+            if (dom.arNoCameraBg) dom.arNoCameraBg.classList.remove('opacity-40');
+            if (dom.arCameraStatus) {
+              dom.arCameraStatus.textContent = 'カメラ未許可/非対応のためコンパス表示で動作中';
+            }
+          }
+        } else {
+          if (dom.arCameraStatus) {
+            dom.arCameraStatus.textContent = 'カメラ非対応端末のためコンパス表示で動作中';
+          }
+        }
+
+        renderArOverlay();
+      }
+
+      function closeArOverlay() {
+        state.ar.active = false;
+        if (state.ar.stream) {
+          state.ar.stream.getTracks().forEach((t) => t.stop());
+          state.ar.stream = null;
+        }
+        if (dom.arVideo) {
+          dom.arVideo.srcObject = null;
+        }
+        if (dom.arOverlay) dom.arOverlay.classList.add('hidden');
+        renderViewportMarkers();
+      }
+
+      function renderArOverlay() {
+        if (!state.ar.active || !dom.arTargetsLayer) return;
+
+        const heading = getEffectiveHeading();
+        if (dom.arHeadingReadout) {
+          dom.arHeadingReadout.textContent = `方位 ${Math.round(heading)}°${state.useManualHeading ? ' (手動)' : ''}`;
+        }
+        if (dom.headingDisplay) {
+          dom.headingDisplay.textContent = `${Math.round(heading)}°`;
+        }
+
+        const refLat = state.userPos.lat ?? SAMPLE_SHIBATA_HYDRANTS[0].lat;
+        const refLon = state.userPos.lon ?? SAMPLE_SHIBATA_HYDRANTS[0].lon;
+        const selected = getSelectedHydrant();
+
+        if (selected) {
+          const sDist = calcDistanceMeters(refLat, refLon, selected.lat, selected.lon);
+          const sBrng = calcBearingDeg(refLat, refLon, selected.lat, selected.lon);
+          if (dom.arSelMeta) {
+            dom.arSelMeta.textContent = `${selected.no ? `No.${selected.no} / ` : ''}${selected.type} / ${Math.round(sDist)}m / 方位${Math.round(sBrng)}°`;
+          }
+          if (dom.arSelAddr) {
+            dom.arSelAddr.textContent = getAddressPrimary(selected);
+          }
+        }
+
+        const fovHalfDeg = 35;
+        const candidates = getFilteredList()
+          .map((h) => {
+            const dist = calcDistanceMeters(refLat, refLon, h.lat, h.lon);
+            const brng = calcBearingDeg(refLat, refLon, h.lat, h.lon);
+            let diff = ((brng - heading + 540) % 360) - 180;
+            return { h, dist, brng, diff };
+          })
+          .filter((entry) => entry.dist <= 250 && Math.abs(entry.diff) <= fovHalfDeg)
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 12);
+
+        dom.arTargetsLayer.innerHTML = '';
+        if (candidates.length === 0) {
+          const emptyNote = document.createElement('div');
+          emptyNote.className =
+            'mx-auto mt-8 w-fit px-4 py-2 rounded-2xl bg-[#0b101b]/85 border border-slate-700 text-xs font-bold text-slate-300';
+          emptyNote.textContent = 'この方角（±35°・250m以内）に該当水利はありません';
+          dom.arTargetsLayer.appendChild(emptyNote);
+          return;
+        }
+
+        candidates.forEach(({ h, dist, diff }, idx) => {
+          const leftPct = 50 + (diff / fovHalfDeg) * 42;
+          const topPx = Math.min(260, 16 + idx * 34);
+          const isSel = selected && h.id === selected.id;
+          const kind = getTypeKind(h.type);
+          const dotColor = kind === 'underground' ? 'bg-cyan-400' : kind === 'aboveground' ? 'bg-rose-500' : 'bg-amber-400';
+
+          const pill = document.createElement('button');
+          pill.type = 'button';
+          pill.style.left = `${leftPct}%`;
+          pill.style.top = `${topPx}px`;
+          pill.style.transform = 'translateX(-50%)';
+          pill.className = `pointer-events-auto absolute px-3 py-1.5 rounded-2xl border-2 text-left shadow-2xl flex items-center gap-2 max-w-[190px] ${
+            isSel
+              ? 'bg-amber-400 text-slate-950 border-white font-black'
+              : 'bg-[#0b101b]/92 text-white border-slate-500 font-bold'
+          }`;
+          pill.innerHTML = `
+            <span class="w-3 h-3 rounded-full shrink-0 ${dotColor} border border-white"></span>
+            <div class="min-w-0">
+              <div class="text-[11px] font-black tabular-nums truncate">${dist < 100 ? dist.toFixed(1) : Math.round(dist)}m · ${escapeHtml(h.type)}</div>
+              <div class="text-[10px] truncate opacity-90">${escapeHtml(getAddressPrimary(h))}</div>
+            </div>
+          `;
+          pill.addEventListener('click', () => {
+            state.selectedId = h.id;
+            updateDetailAndHud();
+            renderArOverlay();
+          });
+          dom.arTargetsLayer.appendChild(pill);
+        });
       }
 
       // =====================================================================
@@ -2019,6 +2415,10 @@
             } else {
               renderViewportMarkers();
             }
+
+            if (state.ar.active) {
+              renderArOverlay();
+            }
           },
           (err) => {
             const labels = {
@@ -2047,7 +2447,12 @@
           }
           if (deg !== null) {
             state.heading = deg;
-            if (dom.headingDisplay) dom.headingDisplay.textContent = `${Math.round(deg)}°`;
+            if (!state.useManualHeading && dom.headingDisplay) {
+              dom.headingDisplay.textContent = `${Math.round(deg)}°`;
+            }
+            if (state.ar.active && !state.useManualHeading) {
+              renderArOverlay();
+            }
           }
         };
 
@@ -2055,11 +2460,18 @@
           DeviceOrientationEvent.requestPermission()
             .then((res) => {
               if (res === 'granted') {
+                state.useManualHeading = false;
                 window.addEventListener('deviceorientation', handler, true);
+                showToast('方位センサーを有効化しました', 'success');
+              } else {
+                showToast('方位センサーが許可されませんでした。手動スライダーをご利用ください', 'warn');
               }
             })
-            .catch(() => {});
+            .catch(() => {
+              showToast('方位センサーの要求に失敗しました', 'warn');
+            });
         } else {
+          state.useManualHeading = false;
           window.addEventListener('deviceorientation', handler, true);
         }
       }
@@ -2086,6 +2498,7 @@
         updateGnssHeader();
         updateDetailAndHud();
         renderViewportMarkers();
+        if (state.ar.active) renderArOverlay();
       }
 
       function stepDemo(dir) {
@@ -2101,6 +2514,7 @@
         updateGnssHeader();
         updateDetailAndHud();
         renderViewportMarkers();
+        if (state.ar.active) renderArOverlay();
       }
 
       // =====================================================================
@@ -2163,6 +2577,7 @@
         const kind = getTypeKind(h.type);
         const addr = getAddressPrimary(h);
         const shift = getEffectiveShiftMeters(h);
+        const heading = getEffectiveHeading();
 
         if (dom.detailNo) dom.detailNo.textContent = h.no ? `No.${h.no}` : 'No.--';
         if (dom.detailType) {
@@ -2211,7 +2626,7 @@
         if (state.userPos.lat !== null && state.userPos.lon !== null) {
           const dist = calcDistanceMeters(state.userPos.lat, state.userPos.lon, h.lat, h.lon);
           const brng = calcBearingDeg(state.userPos.lat, state.userPos.lon, h.lat, h.lon);
-          const rel = (brng - state.heading + 360) % 360;
+          const rel = (brng - heading + 360) % 360;
           const threshold = Math.max(5.0, Number(state.userPos.accuracy || 5.0) + 1.5);
           const near = dist <= threshold;
 
@@ -2255,6 +2670,7 @@
         }
         updateDetailAndHud();
         renderViewportMarkers();
+        if (state.ar.active) renderArOverlay();
 
         const exact = calcDistanceMeters(refLat, refLon, best.lat, best.lon);
         showToast(`最寄り選択: ${getAddressPrimary(best)} (${Math.round(exact)}m)`, 'success');
@@ -2439,13 +2855,16 @@
           card.querySelector('[data-action="revert"]').addEventListener('click', () => {
             const idx = state.hydrants.findIndex((item) => item.id === h.id);
             if (idx === -1) return;
-            if (typeof state.hydrants[idx].origLat === 'number' && typeof state.hydrants[idx].origLon === 'number') {
-              state.hydrants[idx].lat = state.hydrants[idx].origLat;
-              state.hydrants[idx].lon = state.hydrants[idx].origLon;
-            }
-            state.hydrants[idx].modified = false;
-            state.hydrants[idx].modifiedAt = '';
-            state.hydrants[idx].shiftMeters = 0;
+            const revLat = typeof state.hydrants[idx].origLat === 'number' ? state.hydrants[idx].origLat : state.hydrants[idx].lat;
+            const revLon = typeof state.hydrants[idx].origLon === 'number' ? state.hydrants[idx].origLon : state.hydrants[idx].lon;
+            state.hydrants[idx] = compactHydrantRecord({
+              ...state.hydrants[idx],
+              lat: revLat,
+              lon: revLon,
+              modified: false,
+              modifiedAt: '',
+              shiftMeters: 0
+            });
             saveToStorage();
             updateGnssHeader();
             updateDetailAndHud();
@@ -2477,6 +2896,7 @@
         });
 
         if (tabName === 'modified') renderModifiedManager();
+        if (tabName === 'import') updateStorageBudgetUI();
         if (tabName === 'export' && dom.exportModCount) {
           const c = state.hydrants.filter((h) => h.modified).length;
           dom.exportModCount.textContent = `修正済: ${c}件`;
@@ -2501,10 +2921,10 @@
           dom.editRemarks.value = h.remarks || '';
           dom.editSv.value = h.svUrl || '';
         }
-        const effectiveUrl = getConfiguredCsvUrl();
-        if (dom.csvUrlInput && effectiveUrl) {
-          dom.csvUrlInput.value = effectiveUrl;
+        if (dom.csvUrlInput) {
+          dom.csvUrlInput.value = resolveActiveCsvUrl();
         }
+        updateStorageBudgetUI();
         switchDataTab(tabName);
         if (dom.modalData) dom.modalData.classList.remove('hidden');
       }
@@ -2585,6 +3005,13 @@
       // イベントバインド
       // =====================================================================
       function bindEvents() {
+        if (dom.btnBannerCleanup) {
+          dom.btnBannerCleanup.addEventListener('click', cleanupCachePreservingModified);
+        }
+        if (dom.btnCleanupCache) {
+          dom.btnCleanupCache.addEventListener('click', cleanupCachePreservingModified);
+        }
+
         if (dom.filterChips) {
           dom.filterChips.querySelectorAll('button[data-filter]').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -2611,6 +3038,7 @@
               });
               updateDetailAndHud();
               renderViewportMarkers();
+              if (state.ar.active) renderArOverlay();
             });
           });
         }
@@ -2620,6 +3048,7 @@
             state.filterCity = e.target.value;
             updateDetailAndHud();
             renderViewportMarkers();
+            if (state.ar.active) renderArOverlay();
           });
         }
 
@@ -2688,6 +3117,43 @@
 
         if (dom.btnZoomIn) dom.btnZoomIn.addEventListener('click', () => mapRef.map && mapRef.map.zoomIn());
         if (dom.btnZoomOut) dom.btnZoomOut.addEventListener('click', () => mapRef.map && mapRef.map.zoomOut());
+
+        if (dom.btnOpenAr) dom.btnOpenAr.addEventListener('click', openArOverlay);
+        if (dom.btnCloseAr) dom.btnCloseAr.addEventListener('click', closeArOverlay);
+        if (dom.btnArCompassPerm) dom.btnArCompassPerm.addEventListener('click', requestCompassIfNeeded);
+
+        if (dom.btnArSelectMap) {
+          dom.btnArSelectMap.addEventListener('click', () => {
+            const s = getSelectedHydrant();
+            closeArOverlay();
+            if (s && mapRef.map) {
+              mapRef.map.setView([s.lat, s.lon], Math.max(mapRef.map.getZoom(), 18), { animate: true });
+              updateDetailAndHud();
+              renderViewportMarkers();
+            }
+          });
+        }
+
+        const setManualHeadingDeg = (degVal) => {
+          const wrapped = ((Number(degVal) % 360) + 360) % 360;
+          state.useManualHeading = true;
+          state.manualHeading = wrapped;
+          if (dom.arHeadingSlider) dom.arHeadingSlider.value = String(wrapped);
+          if (dom.arSliderVal) dom.arSliderVal.textContent = `${wrapped}°`;
+          updateDetailAndHud();
+          renderViewportMarkers();
+          if (state.ar.active) renderArOverlay();
+        };
+
+        if (dom.arHeadingSlider) {
+          dom.arHeadingSlider.addEventListener('input', (e) => setManualHeadingDeg(e.target.value));
+        }
+        if (dom.btnArTurnLeft) {
+          dom.btnArTurnLeft.addEventListener('click', () => setManualHeadingDeg(getEffectiveHeading() - 15));
+        }
+        if (dom.btnArTurnRight) {
+          dom.btnArTurnRight.addEventListener('click', () => setManualHeadingDeg(getEffectiveHeading() + 15));
+        }
 
         if (dom.btnRelocateStart) {
           dom.btnRelocateStart.addEventListener('click', () => {
@@ -2759,7 +3225,7 @@
 
         if (dom.btnSaveUrl) {
           dom.btnSaveUrl.addEventListener('click', () => {
-            const url = String(dom.csvUrlInput ? dom.csvUrlInput.value : '').trim();
+            const url = compactStr(dom.csvUrlInput ? dom.csvUrlInput.value : '');
             try {
               if (url) {
                 localStorage.setItem(STORAGE_KEYS.URL, url);
@@ -2771,15 +3237,26 @@
           });
         }
 
+        if (dom.btnResetDefaultUrl) {
+          dom.btnResetDefaultUrl.addEventListener('click', () => {
+            try {
+              localStorage.removeItem(STORAGE_KEYS.URL);
+            } catch (e) {}
+            const defUrl = resolveActiveCsvUrl('');
+            if (dom.csvUrlInput) dom.csvUrlInput.value = defUrl;
+            showToast(defUrl ? '既定の公開CSV URLに戻しました' : '既定URL（未設定）に戻しました', 'info');
+          });
+        }
+
         if (dom.btnFetchCsv) {
           dom.btnFetchCsv.addEventListener('click', () => {
-            const url = String(dom.csvUrlInput ? dom.csvUrlInput.value : '').trim();
-            if (url) {
+            const typedUrl = compactStr(dom.csvUrlInput ? dom.csvUrlInput.value : '');
+            if (typedUrl) {
               try {
-                localStorage.setItem(STORAGE_KEYS.URL, url);
+                localStorage.setItem(STORAGE_KEYS.URL, typedUrl);
               } catch (e) {}
             }
-            syncFromPublishedCsv({ silent: false, focusFirst: false });
+            syncFromPublishedCsv({ silent: false, focusFirst: false, urlOverride: typedUrl });
           });
         }
 
@@ -2812,7 +3289,7 @@
 
         if (dom.btnLoadShibataDemo) {
           dom.btnLoadShibataDemo.addEventListener('click', () => {
-            state.hydrants = JSON.parse(JSON.stringify(SAMPLE_SHIBATA_HYDRANTS));
+            state.hydrants = SAMPLE_SHIBATA_HYDRANTS.map(compactHydrantRecord);
             state.selectedId = state.hydrants[0].id;
             saveToStorage();
             rebuildCityOptions();
@@ -2830,7 +3307,7 @@
             try {
               localStorage.removeItem(STORAGE_KEYS.DATA);
             } catch (e) {}
-            state.hydrants = JSON.parse(JSON.stringify(SAMPLE_SHIBATA_HYDRANTS));
+            state.hydrants = SAMPLE_SHIBATA_HYDRANTS.map(compactHydrantRecord);
             state.selectedId = state.hydrants[0].id;
             saveToStorage();
             rebuildCityOptions();
@@ -2861,33 +3338,34 @@
             const origLon = typeof prev.origLon === 'number' ? prev.origLon : prev.lon;
             const totalShift = Number(calcDistanceMeters(origLat, origLon, nLat, nLon).toFixed(1));
 
-            state.hydrants[idx] = {
+            state.hydrants[idx] = compactHydrantRecord({
               ...prev,
-              no: dom.editNo.value.trim(),
-              city: dom.editCity.value.trim(),
+              no: dom.editNo.value,
+              city: dom.editCity.value,
               type: dom.editType.value,
-              address: dom.editAddress.value.trim(),
+              address: dom.editAddress.value,
               lat: nLat,
               lon: nLon,
               origLat,
               origLon,
-              offset: dom.editMemo.value.trim() || '位置メモ未登録',
-              scale: dom.editScale.value.trim(),
-              diameter: dom.editDiameter.value.trim(),
-              sign: dom.editSign.value.trim(),
-              grid: dom.editGrid.value.trim(),
-              remarks: dom.editRemarks.value.trim(),
-              svUrl: dom.editSv.value.trim(),
+              offset: dom.editMemo.value || '位置メモ未登録',
+              scale: dom.editScale.value,
+              diameter: dom.editDiameter.value,
+              sign: dom.editSign.value,
+              grid: dom.editGrid.value,
+              remarks: dom.editRemarks.value,
+              svUrl: dom.editSv.value,
               modified: true,
               modifiedAt: new Date().toLocaleString('ja-JP', { hour12: false }),
               shiftMeters: totalShift
-            };
+            });
 
             saveToStorage();
             rebuildCityOptions();
             updateGnssHeader();
             updateDetailAndHud();
             renderViewportMarkers();
+            if (state.ar.active) renderArOverlay();
             if (dom.modalData) dom.modalData.classList.add('hidden');
             showToast('水利情報を保存しました（修正済として記録）', 'success');
           });
@@ -2914,6 +3392,7 @@
             mapRef.map.invalidateSize();
             renderViewportMarkers();
           }
+          if (state.ar.active) renderArOverlay();
         });
       }
 
@@ -2930,7 +3409,7 @@
         updateGnssHeader();
         updateDetailAndHud();
 
-        if (getConfiguredCsvUrl()) {
+        if (resolveActiveCsvUrl()) {
           syncFromPublishedCsv({ silent: hadCachedData, focusFirst: !hadCachedData });
         }
       });
