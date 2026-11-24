@@ -54,7 +54,7 @@
       font-variant-numeric: tabular-nums;
     }
 
-    /* Stacking context isolation: keep Leaflet map strictly below UI overlays, drawers, and modals */
+    /* Stacking context isolation: Leaflet map panes stay strictly at 1..10 */
     #map-wrapper {
       position: relative;
       flex: 1 1 0%;
@@ -84,6 +84,7 @@
     #leaflet-map .leaflet-top,
     #leaflet-map .leaflet-bottom { z-index: 10; }
 
+    /* UI / AR / Modal / Toast stacking layers (1050..3000) */
     .app-header {
       position: relative;
       z-index: 1200;
@@ -150,6 +151,14 @@
       animation: symbolSelectedPulse 1.5s infinite;
     }
 
+    @keyframes groundRipplePulse {
+      0% { transform: translate(-50%, -50%) scale(0.65); opacity: 0.95; }
+      100% { transform: translate(-50%, -50%) scale(1.55); opacity: 0.08; }
+    }
+    .ar-ground-ripple {
+      animation: groundRipplePulse 1.8s infinite ease-out;
+    }
+
     ::-webkit-scrollbar {
       width: 6px;
       height: 6px;
@@ -183,10 +192,10 @@
         <button id="btn-sync-now" type="button" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-[11px] font-black text-emerald-300 active:scale-95" title="公開CSVから最新データを同期">
           <span id="sync-label">同期</span>
         </button>
-        <button id="btn-autopan-toggle" type="button" class="px-2 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-300 active:scale-95" title="GPS追従中の自動地図移動">
+        <button id="btn-autopan-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-300 active:scale-95" title="GPS追従中の自動地図移動">
           自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
         </button>
-        <button id="btn-demo-toggle" type="button" class="px-2 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-sky-400 active:scale-95">
+        <button id="btn-demo-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-sky-400 active:scale-95">
           <span id="demo-label">デモ:OFF</span>
         </button>
       </div>
@@ -310,8 +319,8 @@
 
     <!-- Bottom-Center Large High-Visibility AR Button -->
     <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 left-3 right-16 flex items-center pointer-events-none">
-      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[260px] min-h-[54px] px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white/80 shadow-[0_10px_26px_rgba(0,0,0,0.85)] flex items-center justify-center gap-2 active:scale-95">
-        <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[272px] min-h-[56px] px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white shadow-[0_12px_28px_rgba(0,0,0,0.88)] flex items-center justify-center gap-2.5 active:scale-95">
+        <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7V5a2 2 0 0 1 2-2h2" />
           <path d="M16 3h2a2 2 0 0 1 2 2v2" />
           <path d="M20 17v2a2 2 0 0 1-2 2h-2" />
@@ -386,29 +395,45 @@
     <video id="ar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover opacity-85"></video>
     <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#0b101b] to-[#050811] pointer-events-none"></div>
 
-    <!-- Center Sightline -->
-    <div class="pointer-events-none absolute inset-0 flex items-center justify-center">
-      <div class="w-0.5 h-full bg-amber-400/25"></div>
-      <div class="w-12 h-12 rounded-full border-2 border-amber-300/60 flex items-center justify-center">
+    <!-- Ground Horizon & Sightline -->
+    <div class="pointer-events-none absolute inset-0 overflow-hidden">
+      <div class="absolute inset-x-0 top-[42%] h-px bg-sky-400/20"></div>
+      <div class="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-amber-400/25"></div>
+      <div class="absolute left-1/2 top-[62%] -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full border-2 border-amber-300/60 flex items-center justify-center">
         <div class="w-2 h-2 rounded-full bg-amber-300"></div>
       </div>
     </div>
 
-    <!-- AR Callout Layer -->
-    <div id="ar-targets-layer" class="pointer-events-none absolute inset-x-0 top-24 bottom-40 overflow-hidden"></div>
+    <!-- Off-Screen Directional Guides -->
+    <div id="ar-offscreen-guides" class="pointer-events-none absolute inset-x-2 top-24 flex items-center justify-between z-10">
+      <button id="ar-guide-left" type="button" class="hidden pointer-events-auto px-3 py-2 rounded-2xl bg-[#0b101b]/92 border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+        ◀ 左方角へ
+      </button>
+      <div class="flex-1"></div>
+      <button id="ar-guide-right" type="button" class="hidden pointer-events-auto px-3 py-2 rounded-2xl bg-[#0b101b]/92 border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+        右方角へ ▶
+      </button>
+    </div>
+
+    <!-- Grounded 3D-Style Pin Projection Layer -->
+    <div id="ar-targets-layer" class="pointer-events-none absolute inset-x-0 top-24 bottom-44 overflow-hidden z-[5]"></div>
 
     <!-- Top AR Bar -->
-    <div class="relative z-10 p-3 bg-gradient-to-b from-[#0b101b]/95 to-transparent flex items-center justify-between gap-2">
-      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl px-3 py-2">
-        <div class="flex items-center gap-2">
+    <div class="relative z-20 p-3 bg-gradient-to-b from-[#0b101b]/95 to-transparent flex items-center justify-between gap-2">
+      <div class="bg-[#111827]/92 border border-slate-700 rounded-2xl px-3 py-2 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs font-black text-amber-300">AR探索</span>
           <span id="ar-heading-readout" class="text-xs font-black text-sky-300 tabular-nums">方位 0°</span>
+          <span id="ar-range-readout" class="text-[11px] font-bold text-emerald-300 tabular-nums">上限 150m</span>
         </div>
-        <div id="ar-camera-status" class="text-[11px] text-slate-300 mt-0.5 truncate max-w-[220px]">
+        <div id="ar-camera-status" class="text-[11px] text-slate-300 mt-0.5 truncate max-w-[210px]">
           現在地基準で周辺水利を表示中
         </div>
       </div>
-      <div class="flex items-center gap-1.5">
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="btn-ar-tune-toggle" type="button" class="px-3 py-2.5 rounded-2xl bg-amber-500/20 border border-amber-400 text-xs font-black text-amber-300 shadow-lg active:scale-95">
+          表示調整
+        </button>
         <button id="btn-ar-compass-perm" type="button" class="px-3 py-2.5 rounded-2xl bg-sky-500 text-slate-950 text-xs font-black shadow-lg active:scale-95">
           方位許可
         </button>
@@ -418,8 +443,42 @@
       </div>
     </div>
 
+    <!-- Collapsible AR Tuning Panel (Max Distance, Scale Multiplier, Ground Vertical Offset) -->
+    <div id="ar-tune-panel" class="hidden relative z-20 mx-3 mb-1 bg-[#111827]/95 border-2 border-amber-400/80 rounded-2xl p-3 shadow-2xl backdrop-blur-md space-y-2.5">
+      <div class="flex items-center justify-between gap-2">
+        <span class="text-xs font-black text-amber-300">ARピン表示パラメータ調整</span>
+        <button id="btn-ar-tune-reset" type="button" class="px-2.5 py-1 rounded-lg bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-slate-200 active:scale-95">
+          既定値に戻す
+        </button>
+      </div>
+
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-200">
+          <span>最大表示距離</span>
+          <span id="ar-tune-maxdist-val" class="text-sky-300 font-black tabular-nums">150m</span>
+        </div>
+        <input id="ar-tune-maxdist" type="range" min="50" max="300" step="10" value="150" aria-label="AR最大表示距離" class="w-full accent-sky-400 h-5">
+      </div>
+
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-200">
+          <span>距離に応じたピンサイズ倍率</span>
+          <span id="ar-tune-scale-val" class="text-emerald-300 font-black tabular-nums">1.00x</span>
+        </div>
+        <input id="ar-tune-scale" type="range" min="0.6" max="1.6" step="0.05" value="1.0" aria-label="ARピンサイズ倍率" class="w-full accent-emerald-400 h-5">
+      </div>
+
+      <div class="space-y-1">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-200">
+          <span>地面位置オフセット（上=奥 / 下=手前）</span>
+          <span id="ar-tune-ground-val" class="text-amber-300 font-black tabular-nums">0px</span>
+        </div>
+        <input id="ar-tune-ground" type="range" min="-80" max="80" step="5" value="0" aria-label="AR地面位置オフセット" class="w-full accent-amber-400 h-5">
+      </div>
+    </div>
+
     <!-- Bottom AR Heading Control & Selected Target Card -->
-    <div class="relative z-10 p-3 bg-gradient-to-t from-[#0b101b]/98 via-[#0b101b]/90 to-transparent space-y-2.5">
+    <div class="relative z-20 p-3 bg-gradient-to-t from-[#0b101b]/98 via-[#0b101b]/90 to-transparent space-y-2">
       <div id="ar-selected-card" class="bg-[#111827]/95 border border-amber-400/60 rounded-2xl p-2.5 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div id="ar-sel-meta" class="text-[11px] font-bold text-amber-300 tabular-nums">対象未選択</div>
@@ -430,7 +489,7 @@
         </button>
       </div>
 
-      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl p-2.5 space-y-1.5">
+      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl p-2 space-y-1">
         <div class="flex items-center justify-between text-[11px] font-bold text-slate-300">
           <span>手動カメラ方角調整（センサー非対応・室内確認用）</span>
           <span id="ar-slider-val" class="text-sky-400 font-black tabular-nums">0°</span>
@@ -518,7 +577,7 @@
               </div>
             </div>
             <p class="text-[11px] text-slate-300 leading-relaxed">
-              13列TSVをコピーし、スプレッドシートの該当番号（No.）行へ「値のみ貼り付け（Ctrl+Shift+V / Cmd+Shift+V）」で反映してください。再同期時、シート側が同一座標に更新されると自動で「修正済」が解除されます。
+              13列TSVをコピーし、スプレッドシートの該当番号（No.）行へ「値のみ貼り付け」で反映してください。再同期時、シート側が同一座標に更新されると自動で「修正済」が解除されます。
             </p>
           </div>
 
@@ -701,6 +760,23 @@
         'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
 
       // =====================================================================
+      // AR表示パラメータ設定（調整しやすい一元設定オブジェクト）
+      // =====================================================================
+      const AR_CONFIG = {
+        defaultMaxDistanceM: 150,      // AR最大表示距離（m）
+        minMaxDistanceM: 50,
+        maxMaxDistanceM: 300,
+        fovHalfDeg: 35,                // 水平視野角の半分（±35度）
+        maxVisiblePins: 14,            // AR同時描画ピン上限
+        defaultScaleMultiplier: 1.0,   // 距離連動ピンサイズ倍率
+        minPinScale: 0.58,             // 遠方ピン最小スケール下限
+        maxPinScale: 1.32,             // 近距離ピン最大スケール上限
+        defaultGroundOffsetPx: 0,      // 地面位置垂直オフセット（px: 負=上/奥、正=下/手前）
+        nearGroundRatio: 0.76,         // 0m付近の画面上垂直位置比率（手前足元側）
+        farGroundRatio: 0.43           // 最大距離付近の画面上垂直位置比率（奥の地面側）
+      };
+
+      // =====================================================================
       // 描画・GPS・同期・ストレージ定数
       // =====================================================================
       const MAX_DISPLAY_ITEMS = 100;
@@ -716,7 +792,8 @@
         DATA: 'shibata_hydrant_finder_v4_data',
         URL: 'shibata_hydrant_finder_v4_url',
         AUTOPAN: 'shibata_hydrant_finder_v4_autopan',
-        LAST_SYNC: 'shibata_hydrant_finder_v4_last_sync'
+        LAST_SYNC: 'shibata_hydrant_finder_v4_last_sync',
+        AR_TUNE: 'shibata_hydrant_finder_v4_ar_tune'
       };
 
       const LEGACY_STORAGE_KEYS = [
@@ -896,7 +973,11 @@
         },
         ar: {
           active: false,
-          stream: null
+          stream: null,
+          tuneOpen: false,
+          maxDistanceM: AR_CONFIG.defaultMaxDistanceM,
+          scaleMultiplier: AR_CONFIG.defaultScaleMultiplier,
+          groundOffsetPx: AR_CONFIG.defaultGroundOffsetPx
         }
       };
 
@@ -973,11 +1054,24 @@
         arOverlay: $('ar-overlay'),
         arVideo: $('ar-video'),
         arNoCameraBg: $('ar-no-camera-bg'),
+        arOffscreenGuides: $('ar-offscreen-guides'),
+        arGuideLeft: $('ar-guide-left'),
+        arGuideRight: $('ar-guide-right'),
         arTargetsLayer: $('ar-targets-layer'),
         arHeadingReadout: $('ar-heading-readout'),
+        arRangeReadout: $('ar-range-readout'),
         arCameraStatus: $('ar-camera-status'),
+        btnArTuneToggle: $('btn-ar-tune-toggle'),
         btnArCompassPerm: $('btn-ar-compass-perm'),
         btnCloseAr: $('btn-close-ar'),
+        arTunePanel: $('ar-tune-panel'),
+        btnArTuneReset: $('btn-ar-tune-reset'),
+        arTuneMaxdist: $('ar-tune-maxdist'),
+        arTuneMaxdistVal: $('ar-tune-maxdist-val'),
+        arTuneScale: $('ar-tune-scale'),
+        arTuneScaleVal: $('ar-tune-scale-val'),
+        arTuneGround: $('ar-tune-ground'),
+        arTuneGroundVal: $('ar-tune-ground-val'),
         arSelMeta: $('ar-sel-meta'),
         arSelAddr: $('ar-sel-addr'),
         btnArSelectMap: $('btn-ar-select-map'),
@@ -1069,6 +1163,10 @@
           .replace(/>/g, '&gt;')
           .replace(/"/g, '&quot;')
           .replace(/'/g, '&#39;');
+      }
+
+      function clamp(val, min, max) {
+        return Math.min(max, Math.max(min, val));
       }
 
       function toRad(deg) {
@@ -1472,6 +1570,51 @@
         } catch (e) {}
       }
 
+      function saveArTuningToStorage() {
+        try {
+          localStorage.setItem(
+            STORAGE_KEYS.AR_TUNE,
+            JSON.stringify({
+              maxDistanceM: state.ar.maxDistanceM,
+              scaleMultiplier: state.ar.scaleMultiplier,
+              groundOffsetPx: state.ar.groundOffsetPx
+            })
+          );
+        } catch (e) {}
+      }
+
+      function loadArTuningFromStorage() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.AR_TUNE);
+          if (raw) {
+            const t = JSON.parse(raw);
+            if (typeof t.maxDistanceM === 'number') {
+              state.ar.maxDistanceM = clamp(t.maxDistanceM, AR_CONFIG.minMaxDistanceM, AR_CONFIG.maxMaxDistanceM);
+            }
+            if (typeof t.scaleMultiplier === 'number') {
+              state.ar.scaleMultiplier = clamp(t.scaleMultiplier, 0.6, 1.6);
+            }
+            if (typeof t.groundOffsetPx === 'number') {
+              state.ar.groundOffsetPx = clamp(t.groundOffsetPx, -80, 80);
+            }
+          }
+        } catch (e) {}
+        syncArTuneControlsUI();
+      }
+
+      function syncArTuneControlsUI() {
+        if (dom.arTuneMaxdist) dom.arTuneMaxdist.value = String(state.ar.maxDistanceM);
+        if (dom.arTuneMaxdistVal) dom.arTuneMaxdistVal.textContent = `${state.ar.maxDistanceM}m`;
+        if (dom.arRangeReadout) dom.arRangeReadout.textContent = `上限 ${state.ar.maxDistanceM}m`;
+
+        if (dom.arTuneScale) dom.arTuneScale.value = String(state.ar.scaleMultiplier);
+        if (dom.arTuneScaleVal) dom.arTuneScaleVal.textContent = `${Number(state.ar.scaleMultiplier).toFixed(2)}x`;
+
+        const gOff = Number(state.ar.groundOffsetPx || 0);
+        if (dom.arTuneGround) dom.arTuneGround.value = String(gOff);
+        if (dom.arTuneGroundVal) dom.arTuneGroundVal.textContent = `${gOff > 0 ? `+${gOff}` : gOff}px`;
+      }
+
       function updateStorageBudgetUI(byteLength) {
         const bytes = typeof byteLength === 'number' ? byteLength : JSON.stringify(state.hydrants).length;
         const kb = (bytes / 1024).toFixed(1);
@@ -1518,6 +1661,7 @@
           if (state.lastSyncAt) {
             localStorage.setItem(STORAGE_KEYS.LAST_SYNC, state.lastSyncAt);
           }
+          saveArTuningToStorage();
         } catch (e) {}
         const bytes = JSON.stringify(state.hydrants).length;
         updateStorageBudgetUI(bytes);
@@ -1538,6 +1682,7 @@
 
       function loadFromStorage() {
         cleanupLegacyStorageKeys();
+        loadArTuningFromStorage();
         let hasCachedData = false;
         let payloadLen = 0;
 
@@ -1744,7 +1889,6 @@
             .map((entry) => entry.h);
         }
 
-        // Always keep selected hydrant visible even if outside viewport or truncated
         if (selected && !selectedList.some((h) => h.id === selected.id)) {
           if (selectedList.length >= MAX_DISPLAY_ITEMS) {
             selectedList[selectedList.length - 1] = selected;
@@ -1838,13 +1982,6 @@
         renderViewportMarkers();
       }
 
-      /**
-       * Text-free compact geometric symbols:
-       * - Underground (地下式): Cyan circle with white border and inner ring
-       * - Aboveground (地上式): Red rounded square with white border and inner dot
-       * - Active selection: Gold border + pulse highlight
-       * - Modified: Tiny yellow indicator dot on top-right
-       */
       function createSymbolIcon(h, isSelected) {
         const kind = getTypeKind(h.type);
         const isUg = kind === 'underground';
@@ -2195,7 +2332,7 @@
       }
 
       // =====================================================================
-      // AR カメラ＆方位センサーオーバーレイ
+      // AR カメラ＆地面接地3D風ピンオーバーレイ（パラメータ調整対応）
       // =====================================================================
       async function openArOverlay() {
         const baseLat =
@@ -2214,6 +2351,7 @@
           if (dom.arSliderVal) dom.arSliderVal.textContent = `${state.manualHeading}°`;
         }
 
+        syncArTuneControlsUI();
         state.ar.active = true;
         if (dom.arOverlay) dom.arOverlay.classList.remove('hidden');
         if (dom.arCameraStatus) dom.arCameraStatus.textContent = '背面カメラを起動中...';
@@ -2251,6 +2389,8 @@
 
       function closeArOverlay() {
         state.ar.active = false;
+        state.ar.tuneOpen = false;
+        if (dom.arTunePanel) dom.arTunePanel.classList.add('hidden');
         if (state.ar.stream) {
           state.ar.stream.getTracks().forEach((t) => t.stop());
           state.ar.stream = null;
@@ -2266,8 +2406,15 @@
         if (!state.ar.active || !dom.arTargetsLayer) return;
 
         const heading = getEffectiveHeading();
+        const maxDist = clamp(Number(state.ar.maxDistanceM || AR_CONFIG.defaultMaxDistanceM), AR_CONFIG.minMaxDistanceM, AR_CONFIG.maxMaxDistanceM);
+        const scaleMult = clamp(Number(state.ar.scaleMultiplier || AR_CONFIG.defaultScaleMultiplier), 0.6, 1.6);
+        const groundOffset = clamp(Number(state.ar.groundOffsetPx || 0), -80, 80);
+
         if (dom.arHeadingReadout) {
           dom.arHeadingReadout.textContent = `方位 ${Math.round(heading)}°${state.useManualHeading ? ' (手動)' : ''}`;
+        }
+        if (dom.arRangeReadout) {
+          dom.arRangeReadout.textContent = `上限 ${maxDist}m`;
         }
         if (dom.headingDisplay) {
           dom.headingDisplay.textContent = `${Math.round(heading)}°`;
@@ -2288,58 +2435,124 @@
           }
         }
 
-        const fovHalfDeg = 35;
-        const candidates = getFilteredList()
+        const inRange = getFilteredList()
           .map((h) => {
             const dist = calcDistanceMeters(refLat, refLon, h.lat, h.lon);
             const brng = calcBearingDeg(refLat, refLon, h.lat, h.lon);
-            let diff = ((brng - heading + 540) % 360) - 180;
+            const diff = ((brng - heading + 540) % 360) - 180;
             return { h, dist, brng, diff };
           })
-          .filter((entry) => entry.dist <= 250 && Math.abs(entry.diff) <= fovHalfDeg)
-          .sort((a, b) => a.dist - b.dist)
-          .slice(0, 12);
+          .filter((entry) => entry.dist <= maxDist);
 
+        // Off-screen directional guides toward nearest hydrant in range outside FOV
+        let leftCandidate = null;
+        let rightCandidate = null;
+        inRange.forEach((item) => {
+          if (item.diff < -AR_CONFIG.fovHalfDeg) {
+            if (!leftCandidate || item.dist < leftCandidate.dist) leftCandidate = item;
+          } else if (item.diff > AR_CONFIG.fovHalfDeg) {
+            if (!rightCandidate || item.dist < rightCandidate.dist) rightCandidate = item;
+          }
+        });
+
+        if (dom.arGuideLeft) {
+          if (leftCandidate) {
+            dom.arGuideLeft.classList.remove('hidden');
+            dom.arGuideLeft.textContent = `◀ 左へ (${Math.round(leftCandidate.dist)}m)`;
+            dom.arGuideLeft.dataset.targetHeading = String(Math.round(leftCandidate.brng));
+          } else {
+            dom.arGuideLeft.classList.add('hidden');
+          }
+        }
+        if (dom.arGuideRight) {
+          if (rightCandidate) {
+            dom.arGuideRight.classList.remove('hidden');
+            dom.arGuideRight.textContent = `右へ (${Math.round(rightCandidate.dist)}m) ▶`;
+            dom.arGuideRight.dataset.targetHeading = String(Math.round(rightCandidate.brng));
+          } else {
+            dom.arGuideRight.classList.add('hidden');
+          }
+        }
+
+        const visiblePins = inRange
+          .filter((entry) => Math.abs(entry.diff) <= AR_CONFIG.fovHalfDeg)
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, AR_CONFIG.maxVisiblePins)
+          .sort((a, b) => b.dist - a.dist); // Draw farther pins first so nearer pins sit in front
+
+        const layerHeight = Math.max(220, dom.arTargetsLayer.clientHeight || 360);
         dom.arTargetsLayer.innerHTML = '';
-        if (candidates.length === 0) {
+
+        if (visiblePins.length === 0) {
           const emptyNote = document.createElement('div');
           emptyNote.className =
-            'mx-auto mt-8 w-fit px-4 py-2 rounded-2xl bg-[#0b101b]/85 border border-slate-700 text-xs font-bold text-slate-300';
-          emptyNote.textContent = 'この方角（±35°・250m以内）に該当水利はありません';
+            'mx-auto mt-10 w-fit px-4 py-2 rounded-2xl bg-[#0b101b]/85 border border-slate-700 text-xs font-bold text-slate-300';
+          emptyNote.textContent = `前方（±${AR_CONFIG.fovHalfDeg}°・${maxDist}m以内）に該当水利はありません`;
           dom.arTargetsLayer.appendChild(emptyNote);
           return;
         }
 
-        candidates.forEach(({ h, dist, diff }, idx) => {
-          const leftPct = 50 + (diff / fovHalfDeg) * 42;
-          const topPx = Math.min(260, 16 + idx * 34);
+        visiblePins.forEach(({ h, dist, diff }) => {
+          const distRatio = clamp(dist / maxDist, 0, 1);
+          const leftPct = clamp(50 + (diff / AR_CONFIG.fovHalfDeg) * 42, 8, 92);
+
+          // Ground vertical position: near hydrants sit lower (near foreground ground), far hydrants sit higher (deeper ground)
+          const groundRatio = AR_CONFIG.nearGroundRatio - (AR_CONFIG.nearGroundRatio - AR_CONFIG.farGroundRatio) * Math.pow(distRatio, 0.72);
+          const groundTopPx = clamp(layerHeight * groundRatio + groundOffset, 68, layerHeight - 16);
+
+          // Perspective scale: inverse distance decay clamped to min/max, multiplied by user scaleMultiplier
+          const basePerspective = 1.0 - distRatio * 0.42;
+          const pinScale = clamp(basePerspective * scaleMult, AR_CONFIG.minPinScale, AR_CONFIG.maxPinScale);
+
           const isSel = selected && h.id === selected.id;
           const kind = getTypeKind(h.type);
-          const dotColor = kind === 'underground' ? 'bg-cyan-400' : kind === 'aboveground' ? 'bg-rose-500' : 'bg-amber-400';
+          const headBg =
+            kind === 'underground' ? 'bg-cyan-400 text-slate-950' : kind === 'aboveground' ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-950';
+          const poleColor =
+            kind === 'underground' ? 'bg-cyan-300' : kind === 'aboveground' ? 'bg-rose-400' : 'bg-amber-300';
+          const ringColor =
+            kind === 'underground'
+              ? 'border-cyan-300 bg-cyan-400/25'
+              : kind === 'aboveground'
+              ? 'border-rose-400 bg-rose-500/25'
+              : 'border-amber-300 bg-amber-400/25';
 
-          const pill = document.createElement('button');
-          pill.type = 'button';
-          pill.style.left = `${leftPct}%`;
-          pill.style.top = `${topPx}px`;
-          pill.style.transform = 'translateX(-50%)';
-          pill.className = `pointer-events-auto absolute px-3 py-1.5 rounded-2xl border-2 text-left shadow-2xl flex items-center gap-2 max-w-[190px] ${
-            isSel
-              ? 'bg-amber-400 text-slate-950 border-white font-black'
-              : 'bg-[#0b101b]/92 text-white border-slate-500 font-bold'
-          }`;
-          pill.innerHTML = `
-            <span class="w-3 h-3 rounded-full shrink-0 ${dotColor} border border-white"></span>
-            <div class="min-w-0">
-              <div class="text-[11px] font-black tabular-nums truncate">${dist < 100 ? dist.toFixed(1) : Math.round(dist)}m · ${escapeHtml(h.type)}</div>
-              <div class="text-[10px] truncate opacity-90">${escapeHtml(getAddressPrimary(h))}</div>
+          const pinEl = document.createElement('button');
+          pinEl.type = 'button';
+          pinEl.style.left = `${leftPct}%`;
+          pinEl.style.top = `${groundTopPx}px`;
+          pinEl.style.transform = `translate(-50%, -100%) scale(${pinScale.toFixed(3)})`;
+          pinEl.style.transformOrigin = '50% 100%';
+          pinEl.style.zIndex = isSel ? '40' : String(10 + Math.round((1 - distRatio) * 20));
+          pinEl.className = 'pointer-events-auto absolute flex flex-col items-center focus:outline-none active:scale-95';
+
+          pinEl.innerHTML = `
+            <div class="px-2 py-1 rounded-xl border ${
+              isSel ? 'bg-amber-400 text-slate-950 border-white shadow-xl' : 'bg-[#0b101b]/92 text-white border-slate-500 shadow-lg'
+            } max-w-[148px] text-center">
+              <div class="text-[11px] font-black tabular-nums leading-tight">${dist < 100 ? dist.toFixed(1) : Math.round(dist)}m</div>
+              <div class="text-[10px] font-bold truncate leading-tight">${escapeHtml(getAddressPrimary(h))}</div>
+            </div>
+            <div class="mt-1 w-9 h-9 rounded-full ${headBg} ${
+              isSel ? 'border-[3px] border-amber-300 ring-2 ring-white' : 'border-2 border-white'
+            } shadow-[0_6px_14px_rgba(0,0,0,0.85)] flex flex-col items-center justify-center">
+              <span class="text-[9px] font-black leading-none">${h.type.includes('地下') ? '地下' : h.type.includes('地上') ? '地上' : '水利'}</span>
+              ${h.no ? `<span class="text-[8px] font-black tabular-nums leading-none mt-0.5">#${escapeHtml(h.no)}</span>` : ''}
+            </div>
+            <div class="w-1 h-7 ${poleColor} shadow"></div>
+            <div class="relative w-8 h-3 flex items-center justify-center">
+              <span class="ar-ground-ripple absolute left-1/2 top-1/2 w-7 h-2.5 rounded-full border ${ringColor}"></span>
+              <span class="w-2.5 h-1.5 rounded-full bg-white shadow"></span>
             </div>
           `;
-          pill.addEventListener('click', () => {
+
+          pinEl.addEventListener('click', () => {
             state.selectedId = h.id;
             updateDetailAndHud();
             renderArOverlay();
           });
-          dom.arTargetsLayer.appendChild(pill);
+
+          dom.arTargetsLayer.appendChild(pinEl);
         });
       }
 
@@ -3177,6 +3390,66 @@
         if (dom.btnOpenAr) dom.btnOpenAr.addEventListener('click', openArOverlay);
         if (dom.btnCloseAr) dom.btnCloseAr.addEventListener('click', closeArOverlay);
         if (dom.btnArCompassPerm) dom.btnArCompassPerm.addEventListener('click', requestCompassIfNeeded);
+
+        if (dom.btnArTuneToggle) {
+          dom.btnArTuneToggle.addEventListener('click', () => {
+            state.ar.tuneOpen = !state.ar.tuneOpen;
+            if (dom.arTunePanel) dom.arTunePanel.classList.toggle('hidden', !state.ar.tuneOpen);
+          });
+        }
+
+        if (dom.arTuneMaxdist) {
+          dom.arTuneMaxdist.addEventListener('input', (e) => {
+            state.ar.maxDistanceM = clamp(Number(e.target.value), AR_CONFIG.minMaxDistanceM, AR_CONFIG.maxMaxDistanceM);
+            syncArTuneControlsUI();
+            saveArTuningToStorage();
+            renderArOverlay();
+          });
+        }
+
+        if (dom.arTuneScale) {
+          dom.arTuneScale.addEventListener('input', (e) => {
+            state.ar.scaleMultiplier = clamp(Number(e.target.value), 0.6, 1.6);
+            syncArTuneControlsUI();
+            saveArTuningToStorage();
+            renderArOverlay();
+          });
+        }
+
+        if (dom.arTuneGround) {
+          dom.arTuneGround.addEventListener('input', (e) => {
+            state.ar.groundOffsetPx = clamp(Number(e.target.value), -80, 80);
+            syncArTuneControlsUI();
+            saveArTuningToStorage();
+            renderArOverlay();
+          });
+        }
+
+        if (dom.btnArTuneReset) {
+          dom.btnArTuneReset.addEventListener('click', () => {
+            state.ar.maxDistanceM = AR_CONFIG.defaultMaxDistanceM;
+            state.ar.scaleMultiplier = AR_CONFIG.defaultScaleMultiplier;
+            state.ar.groundOffsetPx = AR_CONFIG.defaultGroundOffsetPx;
+            syncArTuneControlsUI();
+            saveArTuningToStorage();
+            renderArOverlay();
+            showToast('AR表示パラメータを既定値に戻しました', 'info');
+          });
+        }
+
+        const applyGuideTurn = (btnEl) => {
+          if (!btnEl || !btnEl.dataset.targetHeading) return;
+          const targetDeg = Number(btnEl.dataset.targetHeading);
+          state.useManualHeading = true;
+          state.manualHeading = ((targetDeg % 360) + 360) % 360;
+          if (dom.arHeadingSlider) dom.arHeadingSlider.value = String(state.manualHeading);
+          if (dom.arSliderVal) dom.arSliderVal.textContent = `${state.manualHeading}°`;
+          updateDetailAndHud();
+          renderViewportMarkers();
+          renderArOverlay();
+        };
+        if (dom.arGuideLeft) dom.arGuideLeft.addEventListener('click', () => applyGuideTurn(dom.arGuideLeft));
+        if (dom.arGuideRight) dom.arGuideRight.addEventListener('click', () => applyGuideTurn(dom.arGuideRight));
 
         if (dom.btnArSelectMap) {
           dom.btnArSelectMap.addEventListener('click', () => {
