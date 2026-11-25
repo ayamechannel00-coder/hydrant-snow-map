@@ -329,20 +329,20 @@
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
         <div></div>
-        <button type="button" data-move="n" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">↑北</button>
+        <button type="button" data-move="n" class="py-1.5 rounded bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">↑</button>
         <div></div>
-        <button type="button" data-move="w" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">←西</button>
-        <button type="button" data-move="acc" class="p-1.5 bg-[#1e293b] rounded-lg text-[10px] font-bold text-amber-300 active:bg-slate-600">誤差</button>
-        <button type="button" data-move="e" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">東→</button>
+        <button type="button" data-move="w" class="py-1.5 rounded bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">←</button>
+        <button type="button" data-move="acc" class="py-1.5 rounded bg-[#0c2d48] border border-sky-400 text-[10px] font-black text-sky-300 active:scale-95">精度</button>
+        <button type="button" data-move="e" class="py-1.5 rounded bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">→</button>
         <div></div>
-        <button type="button" data-move="s" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:scale-95">↓南</button>
+        <button type="button" data-move="s" class="py-1.5 rounded bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">↓</button>
         <div></div>
       </div>
     </div>
 
-    <!-- Bottom-Left Compact Button Group: AR & GPS追従 Side-by-Side -->
+    <!-- Bottom-Left Compact Button Group: AR, GPS追従 & 現在地 Side-by-Side -->
     <div class="map-overlay-ui ui-lock-zoom absolute bottom-2.5 left-2.5 flex items-center gap-1.5 pointer-events-auto">
-      <button id="btn-open-ar" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1.5 whitespace-nowrap active:scale-95">
+      <button id="btn-open-ar" type="button" class="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95">
         <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7V5a2 2 0 0 1 2-2h2" />
           <path d="M16 3h2a2 2 0 0 1 2 2v2" />
@@ -353,8 +353,19 @@
         <span>AR</span>
       </button>
 
-      <button id="btn-gps-watch" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95">
+      <button id="btn-gps-watch" type="button" class="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95">
         <span id="gps-btn-label">GPS追従</span>
+      </button>
+
+      <button id="btn-return-current" type="button" class="min-h-[38px] px-2 py-1.5 rounded-xl bg-[#111827] hover:bg-[#1e293b] text-sky-300 font-black text-[11px] border border-sky-400 shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95" title="現在地へ戻る（未取得時は再測位）">
+        <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v3" />
+          <path d="M12 19v3" />
+          <path d="M2 12h3" />
+          <path d="M19 12h3" />
+        </svg>
+        <span>現在地</span>
       </button>
     </div>
 
@@ -382,13 +393,13 @@
           一覧/読込
         </button>
         <button id="btn-bottom-collapse" type="button" class="min-h-[34px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-sky-300 text-[11px] font-black whitespace-nowrap active:scale-95">
-          <span id="bottom-collapse-label">詳細開く</span>
+          <span id="bottom-collapse-label">収納</span>
         </button>
       </div>
     </div>
 
-    <!-- Collapsible Bottom Detail Drawer (Hidden on launch because bottomCollapsed = true) -->
-    <div id="bottom-collapsible-drawer" class="hidden mt-1.5 pt-1.5 border-t border-slate-800">
+    <!-- Collapsible Bottom Detail Drawer (Expanded on launch because bottomCollapsed = false) -->
+    <div id="bottom-collapsible-drawer" class="mt-1.5 pt-1.5 border-t border-slate-800">
       <div class="bg-[#111827] border border-slate-700 rounded-2xl p-2.5">
         <div class="flex items-center gap-1.5 flex-wrap">
           <span id="detail-type" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#083344] text-cyan-300 border border-cyan-500/60">地下式</span>
@@ -791,185 +802,100 @@
       const DEFAULT_PUBLISHED_CSV_URL =
         'https://docs.google.com/spreadsheets/d/e/2PACX-1vQ4IrGxIJ_CbQqKt-aJRQrzslIZIdJwv9HtLP76UR81R0KHGNiPbR2uHrpkwo3OcpKSoz3GqYD9Ohik/pub?gid=1131518955&single=true&output=csv';
 
-      // =====================================================================
-      // AR表示パラメータ設定（調整しやすい一元設定オブジェクト）
-      // =====================================================================
+      const STORAGE_KEYS = {
+        DATA: 'shibata_hf_v2_data',
+        URL: 'shibata_hf_v2_url',
+        AUTOPAN: 'shibata_hf_v2_autopan',
+        LAST_SYNC: 'shibata_hf_v2_last_sync',
+        AR_TUNE: 'shibata_hf_v2_ar_tune'
+      };
+
+      const LEGACY_STORAGE_KEYS = [
+        'shibata_hydrants_v1',
+        'shibata_hydrant_finder_v1',
+        'hydrant_finder_data',
+        'hydrant_finder_csv_url'
+      ];
+
+      const STORAGE_BUDGET_BYTES = 4.5 * 1024 * 1024;
+      const STORAGE_WARN_RATIO = 0.75;
+      const COORD_MATCH_EPSILON = 0.0000015;
+      const MAX_DISPLAY_ITEMS = 100;
+      const VIEWPORT_DEBOUNCE_MS = 120;
+      const GPS_MAX_ACCURACY_M = 80;
+      const GPS_MIN_INTERVAL_MS = 1500;
+      const GPS_MIN_DISPLACEMENT_M = 2.0;
+
       const AR_CONFIG = {
         defaultMaxDistanceM: 150,
         minMaxDistanceM: 50,
         maxMaxDistanceM: 300,
-        fovHalfDeg: 35,
-        maxVisiblePins: 14,
         defaultScaleMultiplier: 1.0,
-        minPinScale: 0.58,
-        maxPinScale: 1.32,
         defaultGroundOffsetPx: 0,
-        nearGroundRatio: 0.76,
-        farGroundRatio: 0.43
+        fovHalfDeg: 32,
+        maxVisiblePins: 18,
+        nearGroundRatio: 0.92,
+        farGroundRatio: 0.24,
+        minPinScale: 0.58,
+        maxPinScale: 1.45
       };
-
-      // =====================================================================
-      // 描画・GPS・同期・ストレージ定数
-      // =====================================================================
-      const MAX_DISPLAY_ITEMS = 100;
-      const GPS_MIN_INTERVAL_MS = 2000;
-      const GPS_MIN_DISPLACEMENT_M = 5.0;
-      const GPS_MAX_ACCURACY_M = 150.0;
-      const VIEWPORT_DEBOUNCE_MS = 120;
-      const COORD_MATCH_EPSILON = 1e-5;
-      const STORAGE_BUDGET_BYTES = 4.5 * 1024 * 1024;
-      const STORAGE_WARN_RATIO = 0.75;
-
-      const STORAGE_KEYS = {
-        DATA: 'shibata_hydrant_finder_v4_data',
-        URL: 'shibata_hydrant_finder_v4_url',
-        AUTOPAN: 'shibata_hydrant_finder_v4_autopan',
-        LAST_SYNC: 'shibata_hydrant_finder_v4_last_sync',
-        AR_TUNE: 'shibata_hydrant_finder_v4_ar_tune'
-      };
-
-      const LEGACY_STORAGE_KEYS = [
-        'shibata_hydrant_finder_v1_data',
-        'shibata_hydrant_finder_v2_data',
-        'shibata_hydrant_finder_v3_data',
-        'shibata_hydrant_finder_v3_url',
-        'shibata_hydrant_finder_v3_autopan',
-        'shibata_hydrant_finder_v3_last_sync',
-        'hydrant_finder_cache',
-        'hydrant_finder_backup'
-      ];
 
       const SAMPLE_SHIBATA_HYDRANTS = [
         {
-          id: 'sb-1001',
-          no: '1001',
+          id: 'sample-1',
+          no: '1',
           address: '新発田市中央町3-3-3',
-          lat: 37.94812,
-          lon: 139.32755,
-          origLat: 37.94812,
-          origLon: 139.32755,
+          lat: 37.94985,
+          lon: 139.32892,
           city: '新発田市',
-          offset: '市役所東側歩道・消火栓標識ポールから西へ1.5m',
-          type: '地下式',
-          scale: '大',
-          diameter: '150',
-          remarks: '除雪堆雪注意',
-          sign: '丸板ポール',
-          grid: '4-C-2',
-          svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
-        },
-        {
-          id: 'sb-1002',
-          no: '1002',
-          address: '新発田市諏訪町1-4-12',
-          lat: 37.94585,
-          lon: 139.33180,
-          origLat: 37.94585,
-          origLon: 139.33180,
-          city: '新発田市',
-          offset: '新発田駅西口交差点北側・赤色地上式消火栓',
-          type: '地上式',
-          scale: '大',
-          diameter: '200',
-          remarks: '',
-          sign: '丸板',
-          grid: '4-D-4',
-          svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
-        },
-        {
-          id: 'sb-1003',
-          no: '1003',
-          address: '新発田市大手町4-5-8',
-          lat: 37.95160,
-          lon: 139.32510,
-          origLat: 37.95160,
-          origLon: 139.32510,
-          city: '新発田市',
-          offset: '新発田城址公園南側・電柱巻付表示から南西へ2.0m',
-          type: '地下式',
-          scale: '大',
-          diameter: '150',
-          remarks: '',
-          sign: '電柱巻付',
-          grid: '3-B-3',
-          svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
-        },
-        {
-          id: 'sb-1004',
-          no: '1004',
-          address: '新発田市本町2-1-15',
-          lat: 37.94690,
-          lon: 139.32920,
-          origLat: 37.94690,
-          origLon: 139.32920,
-          city: '新発田市',
-          offset: '本町通り歩道縁石際・地上式消火栓',
-          type: '地上式',
-          scale: '大',
-          diameter: '200',
-          remarks: '',
-          sign: '丸板ポール',
-          grid: '4-C-4',
-          svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
-        },
-        {
-          id: 'sb-1005',
-          no: '1005',
-          address: '新発田市新栄町1-8-2',
-          lat: 37.95340,
-          lon: 139.33420,
-          origLat: 37.95340,
-          origLon: 139.33420,
-          city: '新発田市',
-          offset: '新栄町交差点南東角・標識柱から北へ1.2m',
+          offset: '中央町交差点 北西角・歩道脇（積雪時ポール目印）',
           type: '地下式',
           scale: '中',
           diameter: '100',
-          remarks: '側溝際',
-          sign: '丸板ポール',
-          grid: '3-E-1',
+          remarks: 'サンプルデータ',
+          sign: '赤色標識板',
+          grid: '42-C-4',
           svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
+          modified: false
         },
         {
-          id: 'sb-1006',
-          no: '1006',
-          address: '新発田市舟入町2-6-10',
-          lat: 37.94290,
-          lon: 139.32480,
-          origLat: 37.94290,
-          origLon: 139.32480,
+          id: 'sample-2',
+          no: '2',
+          address: '新発田市大手町1-4-6',
+          lat: 37.95124,
+          lon: 139.32718,
           city: '新発田市',
-          offset: '舟入町住宅街・角地ブロック塀から道路側へ1.7m',
-          type: '地下式',
+          offset: '大手町通り沿い・電柱#14横',
+          type: '地上式',
           scale: '大',
-          diameter: '150',
-          remarks: '',
-          sign: '丸板',
-          grid: '5-B-4',
+          diameter: '75',
+          remarks: 'サンプルデータ',
+          sign: '地上柱',
+          grid: '42-B-3',
           svUrl: '',
-          modified: false,
-          modifiedAt: '',
-          shiftMeters: 0
+          modified: false
+        },
+        {
+          id: 'sample-3',
+          no: '3',
+          address: '新発田市本町2-5-12',
+          lat: 37.94862,
+          lon: 139.33105,
+          city: '新発田市',
+          offset: '本町商店街 南側路地入口',
+          type: '地下式',
+          scale: '小',
+          diameter: '100',
+          remarks: 'サンプルデータ',
+          sign: '蓋標示あり',
+          grid: '42-D-5',
+          svUrl: '',
+          modified: false
         }
       ];
 
       // =====================================================================
-      // アプリケーション状態（起動時は上下とも収納状態 topCollapsed/bottomCollapsed = true）
+      // アプリケーション状態（上部は初期収納 topCollapsed=true、下部は初期展開 bottomCollapsed=false）
       // =====================================================================
       const state = {
         hydrants: [],
@@ -977,7 +903,7 @@
         filterType: 'all',
         filterCity: 'all',
         topCollapsed: true,
-        bottomCollapsed: true,
+        bottomCollapsed: false,
         autoPanOnTrack: false,
         isDemo: false,
         isSyncing: false,
@@ -1074,6 +1000,7 @@
         btnOpenAr: $('btn-open-ar'),
         btnGpsWatch: $('btn-gps-watch'),
         gpsBtnLabel: $('gps-btn-label'),
+        btnReturnCurrent: $('btn-return-current'),
         btnBottomCollapse: $('btn-bottom-collapse'),
         bottomCollapseLabel: $('bottom-collapse-label'),
         bottomCollapsibleDrawer: $('bottom-collapsible-drawer'),
@@ -2643,45 +2570,72 @@
           return;
         }
 
+        if (dom.gnssStatus) dom.gnssStatus.textContent = 'GPS測位中';
+        if (dom.coordsDisplay) dom.coordsDisplay.textContent = '現在地を取得中...';
+
         navigator.geolocation.getCurrentPosition(
           (pos) => {
-            const accepted = applyAcceptedPosition(pos, { centerMap: true });
-            if (accepted) {
-              showToast('現在地を表示しました', 'success');
+            if (applyAcceptedPosition(pos, { centerMap: true })) {
+              showToast('現在地を取得して地図に表示しました', 'success');
             }
           },
           (err) => {
-            const statusMap = {
-              1: 'GPS未許可',
-              2: '測位不可',
-              3: '測位タイムアウト'
+            const labels = {
+              1: '位置情報未許可（新発田市周辺を表示中）',
+              2: '現在地未取得（新発田市周辺を表示中）',
+              3: 'GPS測位タイムアウト（新発田市周辺を表示中）'
             };
-            if (dom.gnssStatus) dom.gnssStatus.textContent = statusMap[err.code] || 'GPS待機';
-            if (dom.coordsDisplay && state.userPos.lat === null) {
-              dom.coordsDisplay.textContent = '未取得（新発田市周辺を表示中）';
-            }
+            const msg = labels[err.code] || '現在地未取得（新発田市周辺を表示中）';
+            if (dom.gnssStatus) dom.gnssStatus.textContent = err.code === 1 ? 'GPS未許可' : 'GPS待機';
+            if (dom.coordsDisplay) dom.coordsDisplay.textContent = msg;
           },
           {
             enableHighAccuracy: true,
-            maximumAge: 10000,
-            timeout: 9000
+            maximumAge: 5000,
+            timeout: 8000
           }
         );
       }
 
-      function setGpsWatchButtonUI(isWatching) {
-        if (dom.gpsBtnLabel) {
-          dom.gpsBtnLabel.textContent = isWatching ? '追従中' : 'GPS追従';
+      function returnToCurrentLocation() {
+        if (state.userPos.lat !== null && state.userPos.lon !== null && mapRef.map && !state.relocate.active) {
+          state.lastPannedLat = state.userPos.lat;
+          state.lastPannedLon = state.userPos.lon;
+          mapRef.map.setView([state.userPos.lat, state.userPos.lon], Math.max(mapRef.map.getZoom(), 17), {
+            animate: true
+          });
+          renderViewportMarkers();
+          if (state.ar.active) renderArOverlay();
+          showToast('現在地に戻りました', 'success');
+          return;
         }
-        if (dom.btnGpsWatch) {
-          if (isWatching) {
-            dom.btnGpsWatch.className =
-              'min-h-[38px] px-3 py-1.5 rounded-xl bg-[#0c2d48] text-sky-300 font-black text-xs border-2 border-sky-400 shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95';
-          } else {
-            dom.btnGpsWatch.className =
-              'min-h-[38px] px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95';
+
+        if (!('geolocation' in navigator)) {
+          showToast('この端末はGPS測位に対応していません', 'error');
+          return;
+        }
+
+        showToast('現在地を取得中...', 'info');
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            if (applyAcceptedPosition(pos, { centerMap: true })) {
+              showToast('現在地を表示しました', 'success');
+            }
+          },
+          (err) => {
+            const labels = {
+              1: '位置情報の利用許可が必要です',
+              2: '現在地を取得できません',
+              3: 'GPS測位がタイムアウトしました'
+            };
+            showToast(labels[err.code] || '現在地を取得できませんでした', 'warn');
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 3000,
+            timeout: 9000
           }
-        }
+        );
       }
 
       function toggleGpsWatch() {
@@ -2854,14 +2808,14 @@
           dom.topCollapsibleDrawer.classList.toggle('hidden', Boolean(state.topCollapsed));
         }
         if (dom.topCollapseLabel) {
-          dom.topCollapseLabel.textContent = state.topCollapsed ? '上部展開' : '上部収納';
+          dom.topCollapseLabel.textContent = state.topCollapsed ? '展開' : '収納';
         }
 
         if (dom.bottomCollapsibleDrawer) {
           dom.bottomCollapsibleDrawer.classList.toggle('hidden', Boolean(state.bottomCollapsed));
         }
         if (dom.bottomCollapseLabel) {
-          dom.bottomCollapseLabel.textContent = state.bottomCollapsed ? '詳細開く' : '詳細畳む';
+          dom.bottomCollapseLabel.textContent = state.bottomCollapsed ? '展開' : '収納';
         }
       }
 
@@ -2871,6 +2825,17 @@
           dom.autopanLabel.className = state.autoPanOnTrack
             ? 'text-emerald-400 font-black ml-0.5'
             : 'text-sky-400 font-black ml-0.5';
+        }
+      }
+
+      function setGpsWatchButtonUI(watching) {
+        if (dom.gpsBtnLabel) {
+          dom.gpsBtnLabel.textContent = watching ? '追従中' : 'GPS追従';
+        }
+        if (dom.btnGpsWatch) {
+          dom.btnGpsWatch.className = watching
+            ? 'min-h-[38px] px-2.5 py-1.5 rounded-xl bg-emerald-400 hover:bg-emerald-300 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95'
+            : 'min-h-[38px] px-2.5 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95';
         }
       }
 
@@ -3598,6 +3563,7 @@
         }
 
         if (dom.btnGpsWatch) dom.btnGpsWatch.addEventListener('click', toggleGpsWatch);
+        if (dom.btnReturnCurrent) dom.btnReturnCurrent.addEventListener('click', returnToCurrentLocation);
         if (dom.btnNearest) dom.btnNearest.addEventListener('click', selectNearest);
 
         if (dom.btnOpenList) {
