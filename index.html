@@ -3,13 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="theme-color" content="#0f172a">
   <title>積雪期 水利・消火栓探索＆点検位置修正ツール（新発田市）</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@500;700;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@600;700;800;900&family=Noto+Sans+JP:wght@500;700;900&display=swap" rel="stylesheet">
   <style>
     * {
       box-sizing: border-box;
@@ -21,7 +22,7 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #0b101b;
+      background-color: #0f172a;
       color: #f8fafc;
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
       overscroll-behavior: none;
@@ -30,6 +31,7 @@
     /* Prevent iOS Safari input auto-zoom by keeping form controls >= 16px */
     input, select, textarea {
       font-size: 16px !important;
+      ime-mode: active;
     }
 
     .ui-lock-zoom {
@@ -60,7 +62,7 @@
       flex: 1 1 0%;
       width: 100%;
       overflow: hidden;
-      background-color: #0b101b;
+      background-color: #0f172a;
       z-index: 1;
     }
 
@@ -70,7 +72,7 @@
       width: 100%;
       height: 100%;
       z-index: 1 !important;
-      background-color: #0b101b;
+      background-color: #0f172a;
       touch-action: pan-x pan-y pinch-zoom;
     }
 
@@ -88,10 +90,12 @@
     .app-header {
       position: relative;
       z-index: 1200;
+      background-color: #0f172a;
     }
     .app-footer {
       position: relative;
       z-index: 1200;
+      background-color: #0f172a;
     }
     .map-overlay-ui {
       z-index: 1050;
@@ -109,11 +113,24 @@
       z-index: 3000;
     }
 
+    /* Solid high-contrast surfaces so map lines never bleed through */
+    .solid-surface-dark {
+      background-color: #0f172a;
+      border: 1px solid #334155;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.78);
+    }
+    .solid-surface-elevated {
+      background-color: #1e293b;
+      border: 1px solid #475569;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.78);
+    }
+
     .leaflet-control-attribution {
-      background: rgba(11, 16, 27, 0.85) !important;
-      color: #94a3b8 !important;
+      background: #0f172a !important;
+      color: #cbd5e1 !important;
       font-size: 9px !important;
-      padding: 1px 6px !important;
+      padding: 2px 6px !important;
+      border-top-left-radius: 6px;
     }
     .leaflet-control-attribution a {
       color: #38bdf8 !important;
@@ -124,7 +141,7 @@
       color: #f8fafc !important;
       border: 1.5px solid #475569 !important;
       border-radius: 16px !important;
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.85) !important;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.9) !important;
       padding: 0 !important;
     }
     .leaflet-popup-content {
@@ -137,7 +154,7 @@
       border: 1px solid #475569 !important;
     }
     .leaflet-popup-close-button {
-      color: #94a3b8 !important;
+      color: #cbd5e1 !important;
       font-size: 22px !important;
       padding: 6px 8px !important;
     }
@@ -164,75 +181,77 @@
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #0b101b;
+      background: #0f172a;
     }
     ::-webkit-scrollbar-thumb {
-      background: #334155;
+      background: #475569;
       border-radius: 3px;
     }
   </style>
 </head>
-<body class="flex flex-col h-dvh overflow-hidden bg-[#0b101b] text-slate-100" lang="ja">
+<body class="flex flex-col h-dvh overflow-hidden bg-[#0f172a] text-slate-100" lang="ja">
 
-  <!-- Top Header -->
-  <header class="app-header ui-lock-zoom bg-[#111827] border-b border-slate-800 px-3 pt-2 pb-2 shrink-0 shadow-lg">
-    <div class="flex items-center justify-between gap-1.5">
-      <div class="flex items-center gap-1.5 min-w-0">
-        <div id="gnss-badge" class="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[#0b101b] border border-slate-700 shrink-0">
-          <span id="gnss-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
-          <span id="gnss-status" class="text-[11px] font-bold text-slate-300">GPS測位中</span>
-          <span id="gnss-acc" class="text-xs font-black tabular-nums text-white">--m</span>
-        </div>
-        <button id="btn-header-modified" type="button" class="px-2 py-1 rounded-xl bg-amber-500/20 border border-amber-400/60 text-[11px] font-black text-amber-300 tabular-nums shrink-0 active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
-          修正: <span id="modified-count-num">0</span>件
-        </button>
+  <!-- Top Header: Non-overlapping wrapped layout with opaque dark surfaces -->
+  <header class="app-header ui-lock-zoom bg-[#0f172a] border-b border-slate-700 px-2.5 pt-2 pb-2 shrink-0 shadow-lg">
+    <!-- Row 1: Status & Action Pills (wraps cleanly on narrow mobile screens without overlapping) -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      <div id="gnss-badge" class="inline-flex items-center gap-1.5 min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 shrink-0">
+        <span id="gnss-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0"></span>
+        <span id="gnss-status" class="text-[11px] font-extrabold text-slate-100 whitespace-nowrap">GPS測位中</span>
+        <span id="gnss-acc" class="text-xs font-black tabular-nums text-white whitespace-nowrap">--m</span>
       </div>
 
-      <div class="flex items-center gap-1 shrink-0">
-        <button id="btn-sync-now" type="button" class="px-2.5 py-1.5 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-[11px] font-black text-emerald-300 active:scale-95" title="公開CSVから最新データを同期">
-          <span id="sync-label">同期</span>
-        </button>
-        <button id="btn-autopan-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-slate-300 active:scale-95" title="GPS追従中の自動地図移動">
-          自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
-        </button>
-        <button id="btn-demo-toggle" type="button" class="px-2.5 py-1.5 rounded-xl bg-[#0b101b] border border-slate-700 text-[11px] font-bold text-sky-400 active:scale-95">
-          <span id="demo-label">デモ:OFF</span>
-        </button>
+      <button id="btn-header-modified" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#272012] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
+        修正: <span id="modified-count-num" class="ml-0.5">0</span>件
+      </button>
+
+      <button id="btn-sync-now" type="button" class="inline-flex items-center justify-center min-h-[36px] px-3 py-1 rounded-xl bg-[#0c2d27] border border-emerald-400 text-[11px] font-black text-emerald-300 shrink-0 whitespace-nowrap active:scale-95" title="公開CSVから最新データを同期">
+        <span id="sync-label">同期</span>
+      </button>
+
+      <button id="btn-autopan-toggle" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-slate-200 shrink-0 whitespace-nowrap active:scale-95" title="GPS追従中の自動地図移動">
+        自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
+      </button>
+
+      <button id="btn-demo-toggle" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-sky-400 shrink-0 whitespace-nowrap active:scale-95">
+        <span id="demo-label">デモ:OFF</span>
+      </button>
+    </div>
+
+    <!-- Row 2: Current Location & Heading -->
+    <div class="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-300">
+      <div class="tabular-nums truncate min-w-0">
+        現在地: <span id="coords-display" class="text-white font-bold">取得確認中（新発田市周辺）</span>
+      </div>
+      <div class="tabular-nums shrink-0 whitespace-nowrap bg-[#1e293b] border border-slate-700 px-2 py-0.5 rounded-lg">
+        方位: <span id="heading-display" class="text-sky-400 font-black">--°</span>
       </div>
     </div>
 
-    <div class="mt-1 flex items-center justify-between text-[11px] text-slate-400">
-      <div class="tabular-nums truncate">
-        現在地: <span id="coords-display" class="text-slate-200 font-semibold">取得確認中（新発田市周辺）</span>
+    <!-- Storage Warning Banner (shown only above ~75% of 4.5MB budget) -->
+    <div id="storage-warning-banner" class="hidden mt-1.5 bg-[#451a03] border border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
+      <div class="text-amber-100 font-bold truncate">
+        保存容量使用率 <span id="storage-warn-pct" class="font-black text-amber-300 tabular-nums">--%</span>。キャッシュ整理を推奨
       </div>
-      <div class="tabular-nums shrink-0 ml-2">
-        方位: <span id="heading-display" class="text-sky-400 font-bold">--°</span>
-      </div>
-    </div>
-
-    <!-- High Storage Warning Banner (shown only above ~75% of ~4.5MB budget) -->
-    <div id="storage-warning-banner" class="hidden mt-1.5 bg-amber-950/95 border border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
-      <div class="text-amber-200 font-bold truncate">
-        保存容量使用率 <span id="storage-warn-pct" class="font-black text-amber-300 tabular-nums">--%</span>。キャッシュ整理を推奨します
-      </div>
-      <button id="btn-banner-cleanup" type="button" class="shrink-0 px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px] active:scale-95">
+      <button id="btn-banner-cleanup" type="button" class="shrink-0 min-h-[32px] px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px] whitespace-nowrap active:scale-95">
         キャッシュ整理
       </button>
     </div>
 
-    <!-- Filter Chips & Municipality Selector -->
-    <div class="mt-1.5 flex items-center gap-1.5 overflow-x-auto pb-0.5">
-      <div id="filter-chips" class="flex items-center gap-1 shrink-0">
-        <button type="button" data-filter="all" class="px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-sky-500 text-slate-950">すべて</button>
-        <button type="button" data-filter="underground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300 inline-flex items-center gap-1">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-white inline-block"></span>地下
+    <!-- Row 3: Type Filter Chips & Municipality Selector -->
+    <div class="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
+      <div id="filter-chips" class="flex flex-wrap items-center gap-1.5">
+        <button type="button" data-filter="all" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap">すべて</button>
+        <button type="button" data-filter="underground" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-white inline-block shrink-0"></span>地下
         </button>
-        <button type="button" data-filter="aboveground" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300 inline-flex items-center gap-1">
-          <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 border border-white inline-block"></span>地上
+        <button type="button" data-filter="aboveground" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+          <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 border border-white inline-block shrink-0"></span>地上
         </button>
-        <button type="button" data-filter="modified" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-amber-500/60 text-amber-300">修正済</button>
+        <button type="button" data-filter="modified" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap">修正済</button>
       </div>
-      <select id="city-select" aria-label="市町村フィルタ" class="ml-auto px-2 py-1 rounded-lg bg-[#0b101b] border border-slate-700 text-xs font-bold text-slate-200 shrink-0 max-w-[115px] truncate">
+
+      <select id="city-select" aria-label="市町村フィルタ" class="min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-white font-bold shrink-0 max-w-[135px] truncate">
         <option value="all">全市町村</option>
       </select>
     </div>
@@ -242,67 +261,67 @@
   <main id="map-wrapper">
     <div id="leaflet-map"></div>
 
-    <!-- Top-Left HUD -->
-    <div id="target-hud" class="map-overlay-ui ui-lock-zoom absolute top-3 left-3 bg-[#0b101b]/90 border border-slate-700/90 backdrop-blur-md px-3 py-2 rounded-2xl shadow-xl pointer-events-none max-w-[165px]">
+    <!-- Top-Left Target HUD (Solid Opaque Dark Surface) -->
+    <div id="target-hud" class="map-overlay-ui ui-lock-zoom solid-surface-dark absolute top-2.5 left-2.5 px-3 py-2 rounded-2xl pointer-events-none max-w-[162px]">
       <div class="flex items-center gap-1">
-        <span class="text-[10px] font-bold text-slate-400">ターゲット距離</span>
+        <span class="text-[10px] font-extrabold text-slate-300">ターゲット距離</span>
         <span id="arrival-badge" class="hidden px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-black">至近圏</span>
       </div>
       <div class="flex items-baseline gap-1 mt-0.5">
         <span id="hud-dist" class="text-2xl sm:text-3xl font-black text-white tabular-nums">--</span>
-        <span class="text-xs font-bold text-slate-300">m</span>
+        <span class="text-xs font-bold text-slate-200">m</span>
       </div>
-      <div class="text-[11px] font-bold text-sky-400 tabular-nums">
+      <div class="text-[11px] font-extrabold text-sky-400 tabular-nums">
         方位 <span id="hud-bearing">--°</span> (<span id="hud-rel">--</span>)
       </div>
     </div>
 
-    <!-- Relocation Mode Banner -->
-    <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 bg-amber-950/95 border-2 border-amber-400 rounded-2xl p-3 shadow-2xl backdrop-blur-md pointer-events-auto">
+    <!-- Relocation Mode Banner (Solid Opaque Amber Surface) -->
+    <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 bg-[#451a03] border-2 border-amber-400 rounded-2xl p-3 shadow-2xl pointer-events-auto">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="text-xs font-black text-amber-300 truncate">
             位置修正中: <span id="relocate-addr" class="text-white">--</span>
           </div>
-          <p class="text-[11px] text-amber-100/90 mt-0.5">
+          <p class="text-[11px] text-amber-100 mt-0.5">
             黄色ピンをドラッグ、または地図をタップして位置を指定
           </p>
         </div>
-        <div id="relocate-shift" class="px-2.5 py-1 rounded-xl bg-[#0b101b] border border-amber-400/60 text-xs font-black text-amber-300 tabular-nums shrink-0">
+        <div id="relocate-shift" class="px-2.5 py-1 rounded-xl bg-[#0f172a] border border-amber-400 text-xs font-black text-amber-300 tabular-nums shrink-0">
           0.0m
         </div>
       </div>
       <div class="mt-2.5 grid grid-cols-3 gap-1.5">
-        <button id="btn-relocate-gps" type="button" class="py-2.5 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
+        <button id="btn-relocate-gps" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
           現在地GPS反映
         </button>
-        <button id="btn-relocate-save" type="button" class="py-2.5 px-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs active:scale-95">
+        <button id="btn-relocate-save" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs active:scale-95">
           位置を確定
         </button>
-        <button id="btn-relocate-cancel" type="button" class="py-2.5 px-2 rounded-xl bg-[#111827] border border-slate-600 text-slate-200 font-bold text-xs active:scale-95">
+        <button id="btn-relocate-cancel" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-slate-100 font-bold text-xs active:scale-95">
           取消
         </button>
       </div>
     </div>
 
-    <!-- Top-Right Map Controls & Count Badge -->
-    <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-3 right-3 flex flex-col items-end gap-1.5 pointer-events-none">
-      <div id="viewport-badge" class="px-2.5 py-1.5 rounded-2xl bg-[#0b101b]/92 border border-slate-600 text-[11px] font-black text-emerald-300 shadow-lg tabular-nums pointer-events-none">
+    <!-- Top-Right Map Controls & Solid Opaque Count Badge -->
+    <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-2.5 right-2.5 flex flex-col items-end gap-1.5 pointer-events-none max-w-[54vw]">
+      <div id="viewport-badge" class="px-2.5 py-1.5 rounded-xl bg-[#0f172a] border border-emerald-400/80 text-[11px] font-black text-emerald-300 shadow-[0_6px_16px_rgba(0,0,0,0.85)] tabular-nums pointer-events-none text-right leading-tight">
         表示: 0 / 範囲内0件 (全0件)
       </div>
 
-      <button id="btn-layer-cycle" type="button" class="pointer-events-auto px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-white shadow-lg flex items-center gap-1.5 active:scale-95">
+      <button id="btn-layer-cycle" type="button" class="pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-xl bg-[#111827] border border-slate-500 text-xs font-extrabold text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap active:scale-95">
         <span class="text-sky-400">地図:</span>
         <span id="layer-name">標準地図</span>
       </button>
 
-      <button id="btn-center-user" type="button" class="pointer-events-auto px-3 py-2 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-bold text-sky-300 shadow-lg flex items-center gap-1 active:scale-95">
+      <button id="btn-center-user" type="button" class="pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-xl bg-[#111827] border border-slate-500 text-xs font-extrabold text-sky-300 shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center gap-1 whitespace-nowrap active:scale-95">
         <span>現在地へ移動</span>
       </button>
     </div>
 
     <!-- Bottom-Left Virtual Movement Pad (Demo Mode Only) -->
-    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-20 left-3 bg-[#0b101b]/95 border border-sky-500/60 p-2 rounded-2xl shadow-2xl pointer-events-auto">
+    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-20 left-3 bg-[#0f172a] border border-sky-400 p-2 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
         <div></div>
@@ -317,9 +336,9 @@
       </div>
     </div>
 
-    <!-- Bottom-Center Large High-Visibility AR Button -->
+    <!-- Bottom-Left Large High-Visibility AR Button -->
     <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 left-3 right-16 flex items-center pointer-events-none">
-      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[272px] min-h-[56px] px-4 py-3 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white shadow-[0_12px_28px_rgba(0,0,0,0.88)] flex items-center justify-center gap-2.5 active:scale-95">
+      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[272px] min-h-[54px] px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white shadow-[0_12px_28px_rgba(0,0,0,0.9)] flex items-center justify-center gap-2.5 active:scale-95">
         <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7V5a2 2 0 0 1 2-2h2" />
           <path d="M16 3h2a2 2 0 0 1 2 2v2" />
@@ -332,59 +351,59 @@
       </button>
     </div>
 
-    <!-- Bottom-Right Zoom Controls -->
+    <!-- Bottom-Right Zoom Controls (Solid Opaque Surfaces) -->
     <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
-      <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
-      <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827]/95 border border-slate-600 text-lg font-black text-white shadow-lg flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
+      <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827] border border-slate-500 text-lg font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
+      <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827] border border-slate-500 text-lg font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
     </div>
   </main>
 
   <!-- Bottom Detail Drawer & Primary Action Bar -->
-  <footer class="app-footer ui-lock-zoom bg-[#111827] border-t border-slate-800 px-3 pt-2 pb-2.5 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.5)]">
-    <div class="bg-[#0b101b]/95 border border-slate-800 rounded-2xl p-2.5 mb-2">
+  <footer class="app-footer ui-lock-zoom bg-[#0f172a] border-t border-slate-700 px-3 pt-2 pb-2.5 shrink-0 shadow-[0_-6px_22px_rgba(0,0,0,0.75)]">
+    <div class="bg-[#111827] border border-slate-700 rounded-2xl p-2.5 mb-2">
       <div class="flex items-center gap-1.5 flex-wrap">
-        <span id="detail-no" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-sky-500/20 text-sky-300 border border-sky-500/40 tabular-nums">No.--</span>
-        <span id="detail-type" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40">地下式</span>
-        <span id="detail-spec" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e293b] text-slate-300 border border-slate-700">--</span>
-        <span id="detail-grid" class="hidden px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 tabular-nums">--</span>
-        <span id="detail-mod" class="hidden px-2 py-0.5 rounded-md text-[11px] font-black bg-amber-500/25 text-amber-300 border border-amber-400">修正済</span>
+        <span id="detail-no" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#0c2d48] text-sky-300 border border-sky-500/60 tabular-nums">No.--</span>
+        <span id="detail-type" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#083344] text-cyan-300 border border-cyan-500/60">地下式</span>
+        <span id="detail-spec" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e293b] text-slate-200 border border-slate-600">--</span>
+        <span id="detail-grid" class="hidden px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e1b4b] text-indigo-300 border border-indigo-500/60 tabular-nums">--</span>
+        <span id="detail-mod" class="hidden px-2 py-0.5 rounded-md text-[11px] font-black bg-[#451a03] text-amber-300 border border-amber-400">修正済</span>
       </div>
 
       <h1 id="detail-address" class="text-sm sm:text-base font-black text-white mt-1 truncate">
         シンボルをタップして消火栓を選択
       </h1>
 
-      <div class="mt-1.5 bg-amber-500/10 border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
+      <div class="mt-1.5 bg-[#1e293b] border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
         <div class="min-w-0 flex-1">
-          <div class="text-[10px] font-bold text-amber-300">位置メモ・目印</div>
+          <div class="text-[10px] font-extrabold text-amber-300">位置メモ・目印</div>
           <div id="detail-memo" class="text-xs font-black text-white truncate">--</div>
         </div>
-        <button id="btn-copy-one-tsv" type="button" class="hidden shrink-0 px-2.5 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
+        <button id="btn-copy-one-tsv" type="button" class="hidden shrink-0 min-h-[34px] px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
           行TSVコピー
         </button>
       </div>
 
       <div class="mt-2 grid grid-cols-3 gap-1.5">
-        <a id="btn-sv-link" href="#" target="_blank" rel="noopener noreferrer" class="py-2 px-2 rounded-xl bg-emerald-600/25 border border-emerald-400/70 text-[11px] font-black text-emerald-300 flex items-center justify-center gap-1 active:scale-95">
+        <a id="btn-sv-link" href="#" target="_blank" rel="noopener noreferrer" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#064e3b] border border-emerald-400 text-[11px] font-black text-emerald-200 flex items-center justify-center gap-1 text-center active:scale-95">
           ストリートビュー
         </a>
-        <button id="btn-relocate-start" type="button" class="py-2 px-2 rounded-xl bg-amber-500/25 border border-amber-400/80 text-[11px] font-black text-amber-300 flex items-center justify-center gap-1 active:scale-95">
+        <button id="btn-relocate-start" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-200 flex items-center justify-center gap-1 active:scale-95">
           地図で位置修正
         </button>
-        <button id="btn-edit-sheet" type="button" class="py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-700 text-[11px] font-bold text-slate-200 flex items-center justify-center gap-1 active:scale-95">
+        <button id="btn-edit-sheet" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-[11px] font-bold text-slate-100 flex items-center justify-center gap-1 active:scale-95">
           数値/メモ編集
         </button>
       </div>
     </div>
 
     <div class="grid grid-cols-3 gap-2">
-      <button id="btn-gps-watch" type="button" class="glove-btn bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg shadow-sky-500/20">
+      <button id="btn-gps-watch" type="button" class="glove-btn bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg">
         <span id="gps-btn-label">GPS追従開始</span>
       </button>
-      <button id="btn-nearest" type="button" class="glove-btn bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg shadow-emerald-500/20">
+      <button id="btn-nearest" type="button" class="glove-btn bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg">
         最寄り選択
       </button>
-      <button id="btn-open-list" type="button" class="glove-btn bg-[#1e293b] hover:bg-slate-700 text-white border border-slate-600 text-xs sm:text-sm px-2">
+      <button id="btn-open-list" type="button" class="glove-btn bg-[#1e293b] hover:bg-slate-700 text-white border border-slate-500 text-xs sm:text-sm px-2">
         一覧 / 読込
       </button>
     </div>
@@ -393,11 +412,11 @@
   <!-- Full-Screen AR Camera Overlay -->
   <div id="ar-overlay" class="ar-overlay-ui ui-lock-zoom hidden fixed inset-0 bg-[#050811] flex flex-col justify-between overflow-hidden">
     <video id="ar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover opacity-85"></video>
-    <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#0b101b] to-[#050811] pointer-events-none"></div>
+    <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#0f172a] to-[#050811] pointer-events-none"></div>
 
     <!-- Ground Horizon & Sightline -->
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
-      <div class="absolute inset-x-0 top-[42%] h-px bg-sky-400/20"></div>
+      <div class="absolute inset-x-0 top-[42%] h-px bg-sky-400/25"></div>
       <div class="absolute left-1/2 top-0 bottom-0 w-0.5 -translate-x-1/2 bg-amber-400/25"></div>
       <div class="absolute left-1/2 top-[62%] -translate-x-1/2 -translate-y-1/2 w-12 h-12 rounded-full border-2 border-amber-300/60 flex items-center justify-center">
         <div class="w-2 h-2 rounded-full bg-amber-300"></div>
@@ -405,12 +424,12 @@
     </div>
 
     <!-- Off-Screen Directional Guides -->
-    <div id="ar-offscreen-guides" class="pointer-events-none absolute inset-x-2 top-24 flex items-center justify-between z-10">
-      <button id="ar-guide-left" type="button" class="hidden pointer-events-auto px-3 py-2 rounded-2xl bg-[#0b101b]/92 border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+    <div id="ar-offscreen-guides" class="pointer-events-none absolute inset-x-2 top-28 flex items-center justify-between z-10">
+      <button id="ar-guide-left" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#0f172a] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
         ◀ 左方角へ
       </button>
       <div class="flex-1"></div>
-      <button id="ar-guide-right" type="button" class="hidden pointer-events-auto px-3 py-2 rounded-2xl bg-[#0b101b]/92 border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+      <button id="ar-guide-right" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#0f172a] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
         右方角へ ▶
       </button>
     </div>
@@ -418,36 +437,36 @@
     <!-- Grounded 3D-Style Pin Projection Layer -->
     <div id="ar-targets-layer" class="pointer-events-none absolute inset-x-0 top-24 bottom-44 overflow-hidden z-[5]"></div>
 
-    <!-- Top AR Bar -->
-    <div class="relative z-20 p-3 bg-gradient-to-b from-[#0b101b]/95 to-transparent flex items-center justify-between gap-2">
-      <div class="bg-[#111827]/92 border border-slate-700 rounded-2xl px-3 py-2 min-w-0">
+    <!-- Top AR Bar (Solid Opaque Surfaces & Wrapped Controls) -->
+    <div class="relative z-20 p-2.5 bg-[#0f172a] border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+      <div class="bg-[#1e293b] border border-slate-600 rounded-xl px-2.5 py-1.5 min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs font-black text-amber-300">AR探索</span>
           <span id="ar-heading-readout" class="text-xs font-black text-sky-300 tabular-nums">方位 0°</span>
           <span id="ar-range-readout" class="text-[11px] font-bold text-emerald-300 tabular-nums">上限 150m</span>
         </div>
-        <div id="ar-camera-status" class="text-[11px] text-slate-300 mt-0.5 truncate max-w-[210px]">
+        <div id="ar-camera-status" class="text-[11px] text-slate-200 mt-0.5 truncate">
           現在地基準で周辺水利を表示中
         </div>
       </div>
       <div class="flex items-center gap-1.5 shrink-0">
-        <button id="btn-ar-tune-toggle" type="button" class="px-3 py-2.5 rounded-2xl bg-amber-500/20 border border-amber-400 text-xs font-black text-amber-300 shadow-lg active:scale-95">
+        <button id="btn-ar-tune-toggle" type="button" class="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-[#451a03] border border-amber-400 text-xs font-black text-amber-300 whitespace-nowrap active:scale-95">
           表示調整
         </button>
-        <button id="btn-ar-compass-perm" type="button" class="px-3 py-2.5 rounded-2xl bg-sky-500 text-slate-950 text-xs font-black shadow-lg active:scale-95">
+        <button id="btn-ar-compass-perm" type="button" class="min-h-[40px] px-2.5 py-1.5 rounded-xl bg-sky-500 text-slate-950 text-xs font-black whitespace-nowrap active:scale-95">
           方位許可
         </button>
-        <button id="btn-close-ar" type="button" class="px-3.5 py-2.5 rounded-2xl bg-[#111827]/95 border border-slate-600 text-xs font-black text-white shadow-lg active:scale-95">
+        <button id="btn-close-ar" type="button" class="min-h-[40px] px-3 py-1.5 rounded-xl bg-[#1e293b] border border-slate-500 text-xs font-black text-white whitespace-nowrap active:scale-95">
           閉じる
         </button>
       </div>
     </div>
 
-    <!-- Collapsible AR Tuning Panel (Max Distance, Scale Multiplier, Ground Vertical Offset) -->
-    <div id="ar-tune-panel" class="hidden relative z-20 mx-3 mb-1 bg-[#111827]/95 border-2 border-amber-400/80 rounded-2xl p-3 shadow-2xl backdrop-blur-md space-y-2.5">
+    <!-- Collapsible AR Tuning Panel -->
+    <div id="ar-tune-panel" class="hidden relative z-20 mx-3 my-1 bg-[#111827] border-2 border-amber-400 rounded-2xl p-3 shadow-2xl space-y-2.5">
       <div class="flex items-center justify-between gap-2">
         <span class="text-xs font-black text-amber-300">ARピン表示パラメータ調整</span>
-        <button id="btn-ar-tune-reset" type="button" class="px-2.5 py-1 rounded-lg bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-slate-200 active:scale-95">
+        <button id="btn-ar-tune-reset" type="button" class="min-h-[32px] px-2.5 py-1 rounded-lg bg-[#1e293b] border border-slate-500 text-[11px] font-bold text-slate-100 active:scale-95">
           既定値に戻す
         </button>
       </div>
@@ -477,61 +496,61 @@
       </div>
     </div>
 
-    <!-- Bottom AR Heading Control & Selected Target Card -->
-    <div class="relative z-20 p-3 bg-gradient-to-t from-[#0b101b]/98 via-[#0b101b]/90 to-transparent space-y-2">
-      <div id="ar-selected-card" class="bg-[#111827]/95 border border-amber-400/60 rounded-2xl p-2.5 flex items-center justify-between gap-2">
+    <!-- Bottom AR Heading Control & Selected Target Card (Solid Opaque Surfaces) -->
+    <div class="relative z-20 p-3 bg-[#0f172a] border-t border-slate-700 space-y-2">
+      <div id="ar-selected-card" class="bg-[#111827] border border-amber-400 rounded-2xl p-2.5 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div id="ar-sel-meta" class="text-[11px] font-bold text-amber-300 tabular-nums">対象未選択</div>
           <div id="ar-sel-addr" class="text-xs sm:text-sm font-black text-white truncate">付近の消火栓を選択してください</div>
         </div>
-        <button id="btn-ar-select-map" type="button" class="shrink-0 px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
+        <button id="btn-ar-select-map" type="button" class="shrink-0 min-h-[38px] px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black whitespace-nowrap active:scale-95">
           地図で確認
         </button>
       </div>
 
-      <div class="bg-[#111827]/90 border border-slate-700 rounded-2xl p-2 space-y-1">
-        <div class="flex items-center justify-between text-[11px] font-bold text-slate-300">
+      <div class="bg-[#111827] border border-slate-600 rounded-2xl p-2 space-y-1">
+        <div class="flex items-center justify-between text-[11px] font-bold text-slate-200">
           <span>手動カメラ方角調整（センサー非対応・室内確認用）</span>
           <span id="ar-slider-val" class="text-sky-400 font-black tabular-nums">0°</span>
         </div>
         <div class="flex items-center gap-2">
-          <button id="btn-ar-turn-left" type="button" class="px-3 py-2 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-black text-white active:scale-95">-15°</button>
+          <button id="btn-ar-turn-left" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">-15°</button>
           <input id="ar-heading-slider" type="range" min="0" max="359" value="0" aria-label="カメラ方角スライダー" class="flex-1 accent-amber-400 h-6">
-          <button id="btn-ar-turn-right" type="button" class="px-3 py-2 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-black text-white active:scale-95">+15°</button>
+          <button id="btn-ar-turn-right" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#1e293b] border border-slate-500 text-xs font-black text-white active:scale-95">+15°</button>
         </div>
       </div>
     </div>
   </div>
 
   <!-- Modal 1: Nearby / Viewport List -->
-  <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-3">
-    <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
-      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between gap-2">
+  <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/95 flex flex-col p-3">
+    <div class="bg-[#111827] border border-slate-600 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
+      <div class="p-3.5 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
         <div>
           <h2 class="text-base font-black text-white">消火栓一覧（最大100件）</h2>
           <div id="list-summary" class="text-[11px] text-sky-400 font-bold tabular-nums">--</div>
         </div>
         <div class="flex items-center gap-1.5">
-          <button id="btn-open-modified-manager" type="button" class="px-2.5 py-2 rounded-xl bg-amber-500/20 border border-amber-400/70 text-xs font-black text-amber-300 active:scale-95">
+          <button id="btn-open-modified-manager" type="button" class="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-[#451a03] border border-amber-400 text-xs font-black text-amber-300 whitespace-nowrap active:scale-95">
             修正一覧 (<span id="list-mod-badge-num">0</span>)
           </button>
-          <button id="btn-open-data-modal" type="button" class="px-2.5 py-2 rounded-xl bg-sky-500 text-slate-950 text-xs font-black active:scale-95">
+          <button id="btn-open-data-modal" type="button" class="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-sky-500 text-slate-950 text-xs font-black whitespace-nowrap active:scale-95">
             読込/設定
           </button>
-          <button type="button" data-close="modal-list" class="px-3 py-2 rounded-xl bg-[#1e293b] text-xs font-bold text-slate-300">
+          <button type="button" data-close="modal-list" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-bold text-slate-200 whitespace-nowrap">
             閉じる
           </button>
         </div>
       </div>
 
-      <div class="p-3 border-b border-slate-800 bg-[#0b101b]/60 space-y-2">
-        <input id="list-search" type="text" placeholder="住所・地番・番号・位置メモ・グリッドで検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
-        <div class="flex items-center justify-between gap-2">
+      <div class="p-3 border-b border-slate-700 bg-[#0f172a] space-y-2">
+        <input id="list-search" type="text" placeholder="住所・地番・番号・位置メモ・グリッドで検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#1e293b] border border-slate-600 text-white focus:outline-none focus:border-sky-400">
+        <div class="flex flex-wrap items-center justify-between gap-2">
           <label class="flex items-center gap-1.5 text-xs font-bold text-emerald-300 cursor-pointer">
             <input id="chk-list-bounds" type="checkbox" checked class="accent-emerald-400 w-4 h-4">
             現在の地図表示範囲内のみ
           </label>
-          <span id="list-storage-info" class="text-[11px] text-slate-400 tabular-nums">--</span>
+          <span id="list-storage-info" class="text-[11px] text-slate-300 tabular-nums">--</span>
         </div>
       </div>
 
@@ -540,43 +559,43 @@
   </div>
 
   <!-- Modal 2: 13-Column Import / Fine Edit / Modified Hydrants Sheet Sync Manager -->
-  <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#0b101b]/90 backdrop-blur-sm flex flex-col p-2.5 sm:p-4 overflow-y-auto">
-    <div class="bg-[#111827] border border-slate-700 rounded-2xl flex flex-col w-full max-w-xl mx-auto my-auto overflow-hidden shadow-2xl">
-      <div class="p-3.5 border-b border-slate-800 flex items-center justify-between">
+  <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#0b101b]/95 flex flex-col p-2.5 sm:p-4 overflow-y-auto">
+    <div class="bg-[#111827] border border-slate-600 rounded-2xl flex flex-col w-full max-w-xl mx-auto my-auto overflow-hidden shadow-2xl">
+      <div class="p-3.5 border-b border-slate-700 flex items-center justify-between">
         <h2 id="data-modal-title" class="text-base font-black text-white">データ同期・編集・修正一覧管理</h2>
-        <button type="button" data-close="modal-data" class="px-3 py-2 rounded-xl bg-[#1e293b] text-xs font-bold text-slate-300">
+        <button type="button" data-close="modal-data" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-bold text-slate-200">
           閉じる
         </button>
       </div>
 
-      <div class="grid grid-cols-4 gap-1 bg-[#0b101b] p-1.5 border-b border-slate-800">
-        <button type="button" id="tab-modified" class="py-2 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950">
+      <div class="grid grid-cols-4 gap-1 bg-[#0f172a] p-1.5 border-b border-slate-700">
+        <button type="button" id="tab-modified" class="min-h-[38px] py-1.5 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950">
           修正一覧 (<span id="tab-mod-count">0</span>)
         </button>
-        <button type="button" id="tab-import" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">シート同期</button>
-        <button type="button" id="tab-edit" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">詳細編集</button>
-        <button type="button" id="tab-export" class="py-2 rounded-lg text-[11px] font-bold text-slate-300">TSV/CSV</button>
+        <button type="button" id="tab-import" class="min-h-[38px] py-1.5 rounded-lg text-[11px] font-bold text-slate-200">シート同期</button>
+        <button type="button" id="tab-edit" class="min-h-[38px] py-1.5 rounded-lg text-[11px] font-bold text-slate-200">詳細編集</button>
+        <button type="button" id="tab-export" class="min-h-[38px] py-1.5 rounded-lg text-[11px] font-bold text-slate-200">TSV/CSV</button>
       </div>
 
       <div class="p-3.5 space-y-4 overflow-y-auto max-h-[78vh]">
         <!-- Tab 1: Modified Hydrants / Sheet Sync Manager -->
         <div id="pane-modified" class="space-y-3">
-          <div class="bg-amber-500/10 border border-amber-400/50 rounded-xl p-3 space-y-2">
+          <div class="bg-[#272012] border border-amber-400 rounded-xl p-3 space-y-2">
             <div class="flex items-center justify-between gap-2 flex-wrap">
               <div>
                 <div class="text-xs font-black text-amber-300">管理者向け：修正済み地点のシート反映リスト</div>
-                <div id="modified-manager-summary" class="text-[11px] text-slate-300 tabular-nums">修正済み: 0件</div>
+                <div id="modified-manager-summary" class="text-[11px] text-slate-200 tabular-nums">修正済み: 0件</div>
               </div>
-              <div class="flex items-center gap-1.5">
-                <button id="btn-copy-all-tsv" type="button" class="px-3 py-2 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <button id="btn-copy-all-tsv" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs font-black active:scale-95">
                   全修正13列TSVコピー
                 </button>
-                <button id="btn-copy-summary-list" type="button" class="px-2.5 py-2 rounded-xl bg-[#1e293b] border border-amber-400/60 text-amber-200 text-xs font-bold active:scale-95">
+                <button id="btn-copy-summary-list" type="button" class="min-h-[38px] px-2.5 py-1.5 rounded-xl bg-[#1e293b] border border-amber-400 text-amber-200 text-xs font-bold active:scale-95">
                   確認メモ出力
                 </button>
               </div>
             </div>
-            <p class="text-[11px] text-slate-300 leading-relaxed">
+            <p class="text-[11px] text-slate-200 leading-relaxed">
               13列TSVをコピーし、スプレッドシートの該当番号（No.）行へ「値のみ貼り付け」で反映してください。再同期時、シート側が同一座標に更新されると自動で「修正済」が解除されます。
             </p>
           </div>
@@ -586,57 +605,57 @@
 
         <!-- Tab 2: Published CSV Sync & Import -->
         <div id="pane-import" class="hidden space-y-3.5">
-          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
-            <div class="flex items-center justify-between gap-2">
+          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-xs font-black text-sky-400">公開スプレッドシート CSV URL（自動同期対象）</span>
-              <span id="last-sync-status" class="text-[10px] text-slate-400 tabular-nums">未同期</span>
+              <span id="last-sync-status" class="text-[10px] text-slate-300 tabular-nums">未同期</span>
             </div>
-            <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white focus:outline-none focus:border-sky-400">
+            <input id="csv-url-input" type="url" placeholder="https://docs.google.com/spreadsheets/.../pub?output=csv" class="w-full px-3 py-2.5 rounded-xl bg-[#1e293b] border border-slate-600 text-white focus:outline-none focus:border-sky-400">
             <div class="grid grid-cols-3 gap-1.5">
-              <button id="btn-save-url" type="button" class="py-2.5 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-slate-100 font-bold text-xs active:scale-95">
+              <button id="btn-save-url" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-slate-100 font-bold text-xs active:scale-95">
                 URL保存
               </button>
-              <button id="btn-reset-default-url" type="button" class="py-2.5 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-sky-300 font-bold text-xs active:scale-95">
+              <button id="btn-reset-default-url" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-sky-300 font-bold text-xs active:scale-95">
                 既定URL戻し
               </button>
-              <button id="btn-fetch-csv" type="button" class="py-2.5 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
+              <button id="btn-fetch-csv" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
                 今すぐ同期
               </button>
             </div>
           </div>
 
           <!-- Storage Budget & Cache Cleanup -->
-          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
+          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs font-black text-emerald-300">端末保存容量（4.5MB目安）</span>
-              <span id="storage-budget-detail" class="text-[11px] font-bold text-slate-300 tabular-nums">-- KB (--%)</span>
+              <span id="storage-budget-detail" class="text-[11px] font-bold text-slate-200 tabular-nums">-- KB (--%)</span>
             </div>
-            <button id="btn-cleanup-cache" type="button" class="w-full py-2.5 px-3 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-xs font-black text-emerald-300 active:scale-95">
+            <button id="btn-cleanup-cache" type="button" class="w-full min-h-[40px] py-2 px-3 rounded-xl bg-[#064e3b] border border-emerald-400 text-xs font-black text-emerald-200 active:scale-95">
               不要キャッシュ整理（修正済みデータは保持）
             </button>
           </div>
 
-          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
+          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-amber-300">スプレッドシート行を貼り付け（TSV / CSV・13列）</div>
-            <p class="text-[10px] text-slate-400">
+            <p class="text-[10px] text-slate-300">
               1:番号 / 2:住所・地番 / 3:緯度 / 4:経度 / 5:市町村 / 6:位置メモ / 7:種別 / 8:規模 / 9:口径 / 10:備考 / 11:標識 / 12:地図グリッド / 13:SV URL
             </p>
-            <textarea id="paste-data-textarea" rows="3" placeholder="スプレッドシートからコピーした行を貼り付け..." class="w-full p-2.5 rounded-xl bg-[#111827] border border-slate-700 text-white font-mono focus:outline-none focus:border-amber-400"></textarea>
-            <button id="btn-import-paste" type="button" class="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
+            <textarea id="paste-data-textarea" rows="3" placeholder="スプレッドシートからコピーした行を貼り付け..." class="w-full p-2.5 rounded-xl bg-[#1e293b] border border-slate-600 text-white font-mono focus:outline-none focus:border-amber-400"></textarea>
+            <button id="btn-import-paste" type="button" class="w-full min-h-[42px] py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
               貼り付けデータを反映
             </button>
           </div>
 
-          <div class="bg-[#0b101b]/80 border border-slate-800 p-3 rounded-xl space-y-2">
+          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-emerald-300">CSV / TSVファイルを選択して読込</div>
-            <input id="file-upload-input" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="w-full text-xs text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-500 file:text-slate-950">
+            <input id="file-upload-input" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="w-full text-xs text-slate-200 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-500 file:text-slate-950">
           </div>
 
           <div class="grid grid-cols-2 gap-2">
-            <button id="btn-load-shibata-demo" type="button" class="py-2.5 px-3 rounded-xl bg-emerald-500/20 border border-emerald-400/60 text-xs font-black text-emerald-300 active:scale-95">
+            <button id="btn-load-shibata-demo" type="button" class="min-h-[40px] py-2 px-3 rounded-xl bg-[#064e3b] border border-emerald-400 text-xs font-black text-emerald-200 active:scale-95">
               新発田市サンプル読込
             </button>
-            <button id="btn-clear-storage" type="button" class="py-2.5 px-3 rounded-xl bg-[#1e293b] border border-slate-700 text-xs font-bold text-rose-300 active:scale-95">
+            <button id="btn-clear-storage" type="button" class="min-h-[40px] py-2 px-3 rounded-xl bg-[#1e293b] border border-slate-600 text-xs font-bold text-rose-300 active:scale-95">
               保存データ初期化
             </button>
           </div>
@@ -648,16 +667,16 @@
             <input type="hidden" id="edit-id">
             <div class="grid grid-cols-3 gap-2">
               <div>
-                <label class="block text-[11px] font-bold text-slate-300 mb-1">1: 番号</label>
-                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
+                <label class="block text-[11px] font-bold text-slate-200 mb-1">1: 番号</label>
+                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-slate-300 mb-1">5: 市町村</label>
-                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
+                <label class="block text-[11px] font-bold text-slate-200 mb-1">5: 市町村</label>
+                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
               </div>
               <div>
-                <label class="block text-[11px] font-bold text-slate-300 mb-1">7: 種別</label>
-                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white font-bold">
+                <label class="block text-[11px] font-bold text-slate-200 mb-1">7: 種別</label>
+                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white font-bold">
                   <option value="地下式">地下式</option>
                   <option value="地上式">地上式</option>
                   <option value="防火水槽">防火水槽</option>
@@ -667,53 +686,53 @@
             </div>
 
             <div>
-              <label class="block text-[11px] font-bold text-slate-300 mb-1">2: 住所・地番（必須）</label>
-              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
+              <label class="block text-[11px] font-bold text-slate-200 mb-1">2: 住所・地番（必須）</label>
+              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">3: 緯度 (Lat)</label>
-                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
+                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">4: 経度 (Lon)</label>
-                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white tabular-nums">
+                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
               </div>
             </div>
 
             <div>
               <label class="block text-[11px] font-bold text-amber-300 mb-1">6: 位置メモ・目印（積雪期の基準点・オフセット）</label>
-              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0b101b] border border-slate-700 text-white">
+              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
             </div>
 
             <div class="grid grid-cols-4 gap-1.5">
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">8: 規模</label>
-                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
+                <label class="block text-[10px] text-slate-300 mb-1">8: 規模</label>
+                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">9: 口径</label>
-                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white tabular-nums">
+                <label class="block text-[10px] text-slate-300 mb-1">9: 口径</label>
+                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">11: 標識</label>
-                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
+                <label class="block text-[10px] text-slate-300 mb-1">11: 標識</label>
+                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">12: グリッド</label>
-                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white tabular-nums">
+                <label class="block text-[10px] text-slate-300 mb-1">12: グリッド</label>
+                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white tabular-nums">
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">10: 備考</label>
-                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
+                <label class="block text-[10px] text-slate-300 mb-1">10: 備考</label>
+                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
               </div>
               <div>
-                <label class="block text-[10px] text-slate-400 mb-1">13: SV URL</label>
-                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0b101b] border border-slate-700 text-white">
+                <label class="block text-[10px] text-slate-300 mb-1">13: SV URL</label>
+                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
               </div>
             </div>
 
@@ -725,20 +744,20 @@
 
         <!-- Tab 4: TSV / CSV Export -->
         <div id="pane-export" class="hidden space-y-3.5">
-          <div class="bg-amber-500/10 border border-amber-400/50 p-3 rounded-xl space-y-2.5">
+          <div class="bg-[#272012] border border-amber-400 p-3 rounded-xl space-y-2.5">
             <div class="flex items-center justify-between">
               <span class="text-xs font-black text-amber-300">スプレッドシート貼付用 TSV出力（13列）</span>
               <span id="export-mod-count" class="text-xs font-black text-white tabular-nums">修正済: 0件</span>
             </div>
-            <p class="text-[11px] text-slate-300 leading-relaxed">
+            <p class="text-[11px] text-slate-200 leading-relaxed">
               修正した行の13列タブ区切りテキストをコピーし、元スプレッドシートの該当行へ「値のみ貼り付け」してください。
             </p>
-            <button id="btn-export-modified-tsv" type="button" class="w-full py-2.5 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
+            <button id="btn-export-modified-tsv" type="button" class="w-full min-h-[42px] py-2 rounded-xl bg-amber-400 text-slate-950 font-black text-xs sm:text-sm active:scale-95">
               修正済みの全行をTSVコピー
             </button>
           </div>
 
-          <button id="btn-download-csv" type="button" class="w-full py-3 rounded-xl bg-[#1e293b] border border-slate-600 text-xs sm:text-sm font-black text-emerald-300 active:scale-95">
+          <button id="btn-download-csv" type="button" class="w-full min-h-[42px] py-2.5 rounded-xl bg-[#1e293b] border border-slate-500 text-xs sm:text-sm font-black text-emerald-300 active:scale-95">
             全データCSVダウンロード（13列）
           </button>
         </div>
@@ -763,17 +782,17 @@
       // AR表示パラメータ設定（調整しやすい一元設定オブジェクト）
       // =====================================================================
       const AR_CONFIG = {
-        defaultMaxDistanceM: 150,      // AR最大表示距離（m）
+        defaultMaxDistanceM: 150,
         minMaxDistanceM: 50,
         maxMaxDistanceM: 300,
-        fovHalfDeg: 35,                // 水平視野角の半分（±35度）
-        maxVisiblePins: 14,            // AR同時描画ピン上限
-        defaultScaleMultiplier: 1.0,   // 距離連動ピンサイズ倍率
-        minPinScale: 0.58,             // 遠方ピン最小スケール下限
-        maxPinScale: 1.32,             // 近距離ピン最大スケール上限
-        defaultGroundOffsetPx: 0,      // 地面位置垂直オフセット（px: 負=上/奥、正=下/手前）
-        nearGroundRatio: 0.76,         // 0m付近の画面上垂直位置比率（手前足元側）
-        farGroundRatio: 0.43           // 最大距離付近の画面上垂直位置比率（奥の地面側）
+        fovHalfDeg: 35,
+        maxVisiblePins: 14,
+        defaultScaleMultiplier: 1.0,
+        minPinScale: 0.58,
+        maxPinScale: 1.32,
+        defaultGroundOffsetPx: 0,
+        nearGroundRatio: 0.76,
+        farGroundRatio: 0.43
       };
 
       // =====================================================================
@@ -1141,10 +1160,10 @@
       function showToast(msg, tone = 'info') {
         if (!dom.toastBox) return;
         const styleMap = {
-          info: 'bg-[#111827] border-sky-400 text-white',
-          success: 'bg-emerald-950 border-emerald-400 text-emerald-100',
-          warn: 'bg-amber-950 border-amber-400 text-amber-100',
-          error: 'bg-rose-950 border-rose-400 text-rose-100'
+          info: 'bg-[#0f172a] border-sky-400 text-white',
+          success: 'bg-[#064e3b] border-emerald-400 text-emerald-100',
+          warn: 'bg-[#451a03] border-amber-400 text-amber-100',
+          error: 'bg-[#4c0519] border-rose-400 text-rose-100'
         };
         const div = document.createElement('div');
         div.className = `px-3.5 py-2 rounded-2xl border-2 text-xs font-bold shadow-2xl transition-opacity duration-200 ${styleMap[tone] || styleMap.info}`;
@@ -1230,7 +1249,6 @@
         return 'other';
       }
 
-      /** Address-first display priority: 2nd column (Address/Lot) -> Location Note -> No. */
       function getAddressPrimary(h) {
         if (!h) return '住所未登録';
         const addr = String(h.address || '').trim();
@@ -1487,12 +1505,6 @@
         return items;
       }
 
-      /**
-       * 上流（CSV/シート）データとローカル状態をマージする。
-       * ローカルで修正済（modified === true）の地点は座標・位置メモ・修正状態を保護する。
-       * ただし、上流の座標がローカル修正座標と COORD_MATCH_EPSILON 以内で一致した場合は
-       * 「シート側へ反映済み」とみなして modified フラグを解除する。
-       */
       function mergeUpstreamHydrants(upstreamItems, existingItems) {
         const byNo = new Map();
         const byCoordKey = new Map();
@@ -1550,7 +1562,6 @@
         });
       }
 
-      /** Single source of truth for resolving active published CSV URL */
       function resolveActiveCsvUrl(overrideUrl) {
         if (typeof overrideUrl === 'string' && overrideUrl.trim()) {
           return overrideUrl.trim();
@@ -1715,9 +1726,7 @@
           if (savedSync) {
             updateLastSyncLabel(savedSync);
           }
-        } catch (err) {
-          // Fallback to sample data if storage fails
-        }
+        } catch (err) {}
 
         if (!hasCachedData || !state.hydrants || state.hydrants.length === 0) {
           state.hydrants = SAMPLE_SHIBATA_HYDRANTS.map(compactHydrantRecord);
@@ -1991,7 +2000,7 @@
         const half = boxSize / 2;
 
         const modDot = h.modified
-          ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #0b101b;box-shadow:0 1px 3px rgba(0,0,0,0.8);"></span>`
+          ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #0f172a;box-shadow:0 1px 3px rgba(0,0,0,0.85);"></span>`
           : '';
 
         const outerBorder = isSelected ? '2.5px solid #facc15' : '2px solid #ffffff';
@@ -2007,7 +2016,7 @@
               border-radius:9999px;
               background:#06b6d4;
               border:${outerBorder};
-              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              box-shadow:0 2px 6px rgba(0,0,0,0.8);
               display:flex;
               align-items:center;
               justify-content:center;
@@ -2025,7 +2034,7 @@
               border-radius:5px;
               background:#e11d48;
               border:${outerBorder};
-              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              box-shadow:0 2px 6px rgba(0,0,0,0.8);
               display:flex;
               align-items:center;
               justify-content:center;
@@ -2043,12 +2052,12 @@
               border-radius:6px;
               background:#f59e0b;
               border:${outerBorder};
-              box-shadow:0 2px 6px rgba(0,0,0,0.75);
+              box-shadow:0 2px 6px rgba(0,0,0,0.8);
               display:flex;
               align-items:center;
               justify-content:center;
             ">
-              <span style="width:6px;height:6px;border-radius:2px;background:#0b101b;"></span>
+              <span style="width:6px;height:6px;border-radius:2px;background:#0f172a;"></span>
               ${modDot}
             </div>
           `;
@@ -2106,11 +2115,11 @@
         if (dom.viewportBadge) {
           dom.viewportBadge.textContent = `表示: ${renderedCount} / 範囲内${inBoundsCount}件 (全${totalFiltered}件)`;
           if (inBoundsCount > MAX_DISPLAY_ITEMS) {
-            dom.viewportBadge.classList.remove('text-emerald-300', 'border-slate-600');
-            dom.viewportBadge.classList.add('text-amber-300', 'border-amber-400/70');
+            dom.viewportBadge.classList.remove('text-emerald-300', 'border-emerald-400/80');
+            dom.viewportBadge.classList.add('text-amber-300', 'border-amber-400');
           } else {
-            dom.viewportBadge.classList.remove('text-amber-300', 'border-amber-400/70');
-            dom.viewportBadge.classList.add('text-emerald-300', 'border-slate-600');
+            dom.viewportBadge.classList.remove('text-amber-300', 'border-amber-400');
+            dom.viewportBadge.classList.add('text-emerald-300', 'border-emerald-400/80');
           }
         }
 
@@ -2144,7 +2153,7 @@
             weight: 2,
             dashArray: '3,3',
             fillColor: '#475569',
-            fillOpacity: 0.7
+            fillOpacity: 0.75
           }).addTo(mapRef.relocateGroup);
 
           const shiftLine = L.polyline(
@@ -2167,13 +2176,13 @@
                 height:28px;
                 border-radius:9999px;
                 background:#facc15;
-                border:3px solid #0b101b;
+                border:3px solid #0f172a;
                 box-shadow:0 0 0 2px #facc15, 0 4px 12px rgba(0,0,0,0.85);
                 display:flex;
                 align-items:center;
                 justify-content:center;
               ">
-                <span style="width:8px;height:8px;border-radius:9999px;background:#0b101b;"></span>
+                <span style="width:8px;height:8px;border-radius:9999px;background:#0f172a;"></span>
               </div>`
             })
           }).addTo(mapRef.relocateGroup);
@@ -2444,7 +2453,6 @@
           })
           .filter((entry) => entry.dist <= maxDist);
 
-        // Off-screen directional guides toward nearest hydrant in range outside FOV
         let leftCandidate = null;
         let rightCandidate = null;
         inRange.forEach((item) => {
@@ -2478,7 +2486,7 @@
           .filter((entry) => Math.abs(entry.diff) <= AR_CONFIG.fovHalfDeg)
           .sort((a, b) => a.dist - b.dist)
           .slice(0, AR_CONFIG.maxVisiblePins)
-          .sort((a, b) => b.dist - a.dist); // Draw farther pins first so nearer pins sit in front
+          .sort((a, b) => b.dist - a.dist);
 
         const layerHeight = Math.max(220, dom.arTargetsLayer.clientHeight || 360);
         dom.arTargetsLayer.innerHTML = '';
@@ -2486,7 +2494,7 @@
         if (visiblePins.length === 0) {
           const emptyNote = document.createElement('div');
           emptyNote.className =
-            'mx-auto mt-10 w-fit px-4 py-2 rounded-2xl bg-[#0b101b]/85 border border-slate-700 text-xs font-bold text-slate-300';
+            'mx-auto mt-10 w-fit px-4 py-2 rounded-2xl bg-[#0f172a] border border-slate-600 text-xs font-bold text-slate-200 shadow-xl';
           emptyNote.textContent = `前方（±${AR_CONFIG.fovHalfDeg}°・${maxDist}m以内）に該当水利はありません`;
           dom.arTargetsLayer.appendChild(emptyNote);
           return;
@@ -2496,26 +2504,29 @@
           const distRatio = clamp(dist / maxDist, 0, 1);
           const leftPct = clamp(50 + (diff / AR_CONFIG.fovHalfDeg) * 42, 8, 92);
 
-          // Ground vertical position: near hydrants sit lower (near foreground ground), far hydrants sit higher (deeper ground)
-          const groundRatio = AR_CONFIG.nearGroundRatio - (AR_CONFIG.nearGroundRatio - AR_CONFIG.farGroundRatio) * Math.pow(distRatio, 0.72);
+          const groundRatio =
+            AR_CONFIG.nearGroundRatio - (AR_CONFIG.nearGroundRatio - AR_CONFIG.farGroundRatio) * Math.pow(distRatio, 0.72);
           const groundTopPx = clamp(layerHeight * groundRatio + groundOffset, 68, layerHeight - 16);
 
-          // Perspective scale: inverse distance decay clamped to min/max, multiplied by user scaleMultiplier
           const basePerspective = 1.0 - distRatio * 0.42;
           const pinScale = clamp(basePerspective * scaleMult, AR_CONFIG.minPinScale, AR_CONFIG.maxPinScale);
 
           const isSel = selected && h.id === selected.id;
           const kind = getTypeKind(h.type);
           const headBg =
-            kind === 'underground' ? 'bg-cyan-400 text-slate-950' : kind === 'aboveground' ? 'bg-rose-500 text-white' : 'bg-amber-400 text-slate-950';
+            kind === 'underground'
+              ? 'bg-cyan-400 text-slate-950'
+              : kind === 'aboveground'
+              ? 'bg-rose-500 text-white'
+              : 'bg-amber-400 text-slate-950';
           const poleColor =
             kind === 'underground' ? 'bg-cyan-300' : kind === 'aboveground' ? 'bg-rose-400' : 'bg-amber-300';
           const ringColor =
             kind === 'underground'
-              ? 'border-cyan-300 bg-cyan-400/25'
+              ? 'border-cyan-300 bg-cyan-400/30'
               : kind === 'aboveground'
-              ? 'border-rose-400 bg-rose-500/25'
-              : 'border-amber-300 bg-amber-400/25';
+              ? 'border-rose-400 bg-rose-500/30'
+              : 'border-amber-300 bg-amber-400/30';
 
           const pinEl = document.createElement('button');
           pinEl.type = 'button';
@@ -2528,14 +2539,14 @@
 
           pinEl.innerHTML = `
             <div class="px-2 py-1 rounded-xl border ${
-              isSel ? 'bg-amber-400 text-slate-950 border-white shadow-xl' : 'bg-[#0b101b]/92 text-white border-slate-500 shadow-lg'
+              isSel ? 'bg-amber-400 text-slate-950 border-white shadow-xl' : 'bg-[#0f172a] text-white border-slate-500 shadow-lg'
             } max-w-[148px] text-center">
               <div class="text-[11px] font-black tabular-nums leading-tight">${dist < 100 ? dist.toFixed(1) : Math.round(dist)}m</div>
               <div class="text-[10px] font-bold truncate leading-tight">${escapeHtml(getAddressPrimary(h))}</div>
             </div>
             <div class="mt-1 w-9 h-9 rounded-full ${headBg} ${
               isSel ? 'border-[3px] border-amber-300 ring-2 ring-white' : 'border-2 border-white'
-            } shadow-[0_6px_14px_rgba(0,0,0,0.85)] flex flex-col items-center justify-center">
+            } shadow-[0_6px_14px_rgba(0,0,0,0.9)] flex flex-col items-center justify-center">
               <span class="text-[9px] font-black leading-none">${h.type.includes('地下') ? '地下' : h.type.includes('地上') ? '地上' : '水利'}</span>
               ${h.no ? `<span class="text-[8px] font-black tabular-nums leading-none mt-0.5">#${escapeHtml(h.no)}</span>` : ''}
             </div>
@@ -2632,7 +2643,7 @@
           {
             enableHighAccuracy: true,
             maximumAge: 10000,
-            timeout: 8000
+            timeout: 9000
           }
         );
       }
@@ -2643,7 +2654,7 @@
           state.watchId = null;
           if (dom.gpsBtnLabel) dom.gpsBtnLabel.textContent = 'GPS追従開始';
           if (dom.btnGpsWatch) {
-            dom.btnGpsWatch.classList.remove('bg-sky-950', 'border', 'border-sky-400', 'text-sky-300');
+            dom.btnGpsWatch.classList.remove('bg-[#0c2d48]', 'border', 'border-sky-400', 'text-sky-300');
             dom.btnGpsWatch.classList.add('bg-sky-500', 'text-slate-950');
           }
           showToast('GPS追従を停止しました', 'info');
@@ -2660,7 +2671,7 @@
         if (dom.gpsBtnLabel) dom.gpsBtnLabel.textContent = '追従中（停止）';
         if (dom.btnGpsWatch) {
           dom.btnGpsWatch.classList.remove('bg-sky-500', 'text-slate-950');
-          dom.btnGpsWatch.classList.add('bg-sky-950', 'border', 'border-sky-400', 'text-sky-300');
+          dom.btnGpsWatch.classList.add('bg-[#0c2d48]', 'border', 'border-sky-400', 'text-sky-300');
         }
         showToast('GPS追従を開始しました', 'success');
 
@@ -2806,11 +2817,11 @@
 
         if (dom.btnHeaderModified) {
           if (modTotal > 0) {
-            dom.btnHeaderModified.classList.remove('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
-            dom.btnHeaderModified.classList.add('bg-amber-500/20', 'border-amber-400/70', 'text-amber-300');
+            dom.btnHeaderModified.className =
+              'inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
           } else {
-            dom.btnHeaderModified.classList.remove('bg-amber-500/20', 'border-amber-400/70', 'text-amber-300');
-            dom.btnHeaderModified.classList.add('bg-slate-800/80', 'border-slate-700', 'text-slate-300');
+            dom.btnHeaderModified.className =
+              'inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-black text-slate-200 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
           }
         }
 
@@ -2822,17 +2833,17 @@
           }
           if (dom.gnssDot && dom.gnssStatus) {
             if (acc <= 5) {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400';
+              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0';
               dom.gnssStatus.textContent = '高精度';
-              dom.gnssStatus.className = 'text-[11px] font-black text-emerald-300';
+              dom.gnssStatus.className = 'text-[11px] font-black text-emerald-300 whitespace-nowrap';
             } else if (acc <= 15) {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400';
+              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0';
               dom.gnssStatus.textContent = '標準';
-              dom.gnssStatus.className = 'text-[11px] font-black text-amber-300';
+              dom.gnssStatus.className = 'text-[11px] font-black text-amber-300 whitespace-nowrap';
             } else {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500';
+              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0';
               dom.gnssStatus.textContent = '誤差広';
-              dom.gnssStatus.className = 'text-[11px] font-black text-rose-300';
+              dom.gnssStatus.className = 'text-[11px] font-black text-rose-300 whitespace-nowrap';
             }
           }
         }
@@ -2852,10 +2863,10 @@
           dom.detailType.textContent = h.type || '水利';
           dom.detailType.className =
             kind === 'underground'
-              ? 'px-2 py-0.5 rounded-md text-[11px] font-black bg-cyan-500/20 text-cyan-300 border border-cyan-500/40'
+              ? 'px-2 py-0.5 rounded-md text-[11px] font-black bg-[#083344] text-cyan-300 border border-cyan-500/60'
               : kind === 'aboveground'
-              ? 'px-2 py-0.5 rounded-md text-[11px] font-black bg-rose-500/20 text-rose-300 border border-rose-500/40'
-              : 'px-2 py-0.5 rounded-md text-[11px] font-black bg-amber-500/20 text-amber-300 border border-amber-500/40';
+              ? 'px-2 py-0.5 rounded-md text-[11px] font-black bg-[#4c0519] text-rose-300 border border-rose-500/60'
+              : 'px-2 py-0.5 rounded-md text-[11px] font-black bg-[#451a03] text-amber-300 border border-amber-500/60';
         }
 
         const specText = [h.diameter ? `φ${h.diameter}` : '', h.scale || '', h.sign || ''].filter(Boolean).join(' / ');
@@ -2988,7 +2999,7 @@
         }
 
         if (rows.length === 0) {
-          dom.listContainer.innerHTML = '<div class="text-center text-slate-400 py-8 text-sm">該当する消火栓がありません</div>';
+          dom.listContainer.innerHTML = '<div class="text-center text-slate-300 py-8 text-sm">該当する消火栓がありません</div>';
           return;
         }
 
@@ -2997,10 +3008,10 @@
           const kind = getTypeKind(h.type);
           const badgeCls =
             kind === 'underground'
-              ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/40'
+              ? 'bg-[#083344] text-cyan-300 border-cyan-500/60'
               : kind === 'aboveground'
-              ? 'bg-rose-500/20 text-rose-300 border-rose-500/40'
-              : 'bg-amber-500/20 text-amber-300 border-amber-500/40';
+              ? 'bg-[#4c0519] text-rose-300 border-rose-500/60'
+              : 'bg-[#451a03] text-amber-300 border-amber-500/60';
 
           let distStr = '--m';
           if (state.userPos.lat !== null && state.userPos.lon !== null) {
@@ -3011,12 +3022,12 @@
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = `w-full text-left p-3 rounded-2xl border transition-colors ${
-            h.id === state.selectedId ? 'bg-sky-950/60 border-sky-400' : 'bg-[#0b101b] border-slate-800 hover:border-slate-600'
+            h.id === state.selectedId ? 'bg-[#0c2d48] border-sky-400' : 'bg-[#0f172a] border-slate-700 hover:border-slate-500'
           }`;
           btn.innerHTML = `
             <div class="flex items-center justify-between gap-2">
               <div class="flex items-center gap-1.5 flex-wrap">
-                ${h.no ? `<span class="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 text-[10px] font-black tabular-nums">No.${escapeHtml(h.no)}</span>` : ''}
+                ${h.no ? `<span class="px-1.5 py-0.5 rounded bg-[#0c2d48] text-sky-300 text-[10px] font-black tabular-nums">No.${escapeHtml(h.no)}</span>` : ''}
                 <span class="px-2 py-0.5 rounded border text-[11px] font-bold ${badgeCls}">${escapeHtml(h.type)}</span>
                 ${h.modified ? `<span class="px-1.5 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black">修正済</span>` : ''}
               </div>
@@ -3050,7 +3061,7 @@
         dom.modifiedListContainer.innerHTML = '';
         if (modRows.length === 0) {
           dom.modifiedListContainer.innerHTML = `
-            <div class="text-center text-slate-400 py-8 px-4 rounded-2xl bg-[#0b101b]/70 border border-slate-800 text-xs leading-relaxed">
+            <div class="text-center text-slate-300 py-8 px-4 rounded-2xl bg-[#0f172a] border border-slate-700 text-xs leading-relaxed">
               現在、未反映の修正済み地点はありません。<br>
               地図上のシンボルから「位置を修正」または「数値/メモ編集」を行うとここへ表示されます。
             </div>
@@ -3067,36 +3078,36 @@
           const shift = getEffectiveShiftMeters(h).toFixed(1);
 
           const card = document.createElement('div');
-          card.className = 'bg-[#0b101b] border border-amber-400/40 rounded-2xl p-3 space-y-2';
+          card.className = 'bg-[#0f172a] border border-amber-400/70 rounded-2xl p-3 space-y-2';
           card.innerHTML = `
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
                 <div class="flex items-center gap-1.5 flex-wrap">
                   <span class="px-2 py-0.5 rounded bg-amber-400 text-slate-950 text-[10px] font-black tabular-nums">No.${escapeHtml(h.no || '--')}</span>
-                  <span class="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/50 text-amber-300 text-[11px] font-black tabular-nums">移動 ${shift}m</span>
-                  ${h.modifiedAt ? `<span class="text-[10px] text-slate-400 tabular-nums">${escapeHtml(h.modifiedAt)}</span>` : ''}
+                  <span class="px-2 py-0.5 rounded bg-[#451a03] border border-amber-400 text-amber-300 text-[11px] font-black tabular-nums">移動 ${shift}m</span>
+                  ${h.modifiedAt ? `<span class="text-[10px] text-slate-300 tabular-nums">${escapeHtml(h.modifiedAt)}</span>` : ''}
                 </div>
                 <div class="text-sm font-black text-white mt-1 truncate">${escapeHtml(h.city ? `${h.city} ` : '')}${escapeHtml(addr)}</div>
               </div>
-              <button type="button" data-action="locate" class="shrink-0 px-2.5 py-1.5 rounded-xl bg-sky-500/20 border border-sky-400/60 text-sky-300 text-[11px] font-black active:scale-95">
+              <button type="button" data-action="locate" class="shrink-0 min-h-[34px] px-2.5 py-1 rounded-xl bg-[#0c2d48] border border-sky-400 text-sky-300 text-[11px] font-black active:scale-95">
                 地図表示
               </button>
             </div>
 
-            <div class="bg-[#111827] border border-slate-800 rounded-xl p-2 text-[11px] font-mono space-y-1 tabular-nums">
-              <div class="text-slate-400">元座標: <span class="text-slate-300">${oLat}, ${oLon}</span></div>
+            <div class="bg-[#1e293b] border border-slate-600 rounded-xl p-2 text-[11px] font-mono space-y-1 tabular-nums">
+              <div class="text-slate-300">元座標: <span class="text-slate-100">${oLat}, ${oLon}</span></div>
               <div class="text-emerald-300 font-bold">新座標: <span class="text-white">${nLat}, ${nLon}</span></div>
               <div class="font-sans text-amber-200 font-bold truncate">メモ: ${escapeHtml(h.offset || '--')}</div>
             </div>
 
             <div class="grid grid-cols-3 gap-1.5">
-              <button type="button" data-action="copy-tsv" class="py-2 px-2 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
+              <button type="button" data-action="copy-tsv" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
                 13列行TSVコピー
               </button>
-              <button type="button" data-action="copy-coords" class="py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-sky-300 text-[11px] font-bold active:scale-95">
+              <button type="button" data-action="copy-coords" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-sky-300 text-[11px] font-bold active:scale-95">
                 緯度経度コピー
               </button>
-              <button type="button" data-action="revert" class="py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-700 text-rose-300 text-[11px] font-bold active:scale-95">
+              <button type="button" data-action="revert" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-600 text-rose-300 text-[11px] font-bold active:scale-95">
                 元座標に戻す
               </button>
             </div>
@@ -3157,8 +3168,8 @@
           const active = key === tabName;
           if (obj.btn) {
             obj.btn.className = active
-              ? 'py-2 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950'
-              : 'py-2 rounded-lg text-[11px] font-bold text-slate-300';
+              ? 'min-h-[38px] py-1.5 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950'
+              : 'min-h-[38px] py-1.5 rounded-lg text-[11px] font-bold text-slate-200';
           }
           if (obj.pane) obj.pane.classList.toggle('hidden', !active);
         });
@@ -3288,20 +3299,20 @@
                 const active = b.dataset.filter === state.filterType;
                 if (b.dataset.filter === 'all') {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-sky-500 text-slate-950'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-slate-700 text-slate-300';
+                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap'
+                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-slate-600 text-slate-200 shrink-0 whitespace-nowrap';
                 } else if (b.dataset.filter === 'underground') {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-cyan-400 text-slate-950 inline-flex items-center gap-1'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-cyan-600/60 text-cyan-300 inline-flex items-center gap-1';
+                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-cyan-400 text-slate-950 inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
+                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
                 } else if (b.dataset.filter === 'aboveground') {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-rose-500 text-white inline-flex items-center gap-1'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-rose-600/60 text-rose-300 inline-flex items-center gap-1';
+                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-500 text-white inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
+                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
                 } else {
                   b.className = active
-                    ? 'px-2.5 py-1.5 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950'
-                    : 'px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-[#0b101b] border border-amber-500/60 text-amber-300';
+                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 text-slate-950 shrink-0 whitespace-nowrap'
+                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap';
                 }
               });
               updateDetailAndHud();
