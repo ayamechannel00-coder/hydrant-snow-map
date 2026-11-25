@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#0f172a">
+  <meta name="theme-color" content="#090d16">
   <title>積雪期 水利・消火栓探索＆点検位置修正ツール（新発田市）</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
@@ -22,16 +22,15 @@
       padding: 0;
       width: 100%;
       height: 100%;
-      background-color: #0f172a;
+      background-color: #090d16;
       color: #f8fafc;
       font-family: 'Inter', 'Noto Sans JP', sans-serif;
       overscroll-behavior: none;
     }
 
-    /* Prevent iOS Safari input auto-zoom by keeping form controls >= 16px */
+    /* Prevent mobile auto-zoom on form controls and avoid unwanted IME forcing */
     input, select, textarea {
       font-size: 16px !important;
-      ime-mode: active;
     }
 
     .ui-lock-zoom {
@@ -40,8 +39,8 @@
     }
 
     .glove-btn {
-      min-height: 46px;
-      border-radius: 14px;
+      min-height: 44px;
+      border-radius: 12px;
       font-weight: 800;
       display: inline-flex;
       align-items: center;
@@ -62,7 +61,7 @@
       flex: 1 1 0%;
       width: 100%;
       overflow: hidden;
-      background-color: #0f172a;
+      background-color: #090d16;
       z-index: 1;
     }
 
@@ -72,7 +71,7 @@
       width: 100%;
       height: 100%;
       z-index: 1 !important;
-      background-color: #0f172a;
+      background-color: #090d16;
       touch-action: pan-x pan-y pinch-zoom;
     }
 
@@ -90,12 +89,12 @@
     .app-header {
       position: relative;
       z-index: 1200;
-      background-color: #0f172a;
+      background-color: #090d16;
     }
     .app-footer {
       position: relative;
       z-index: 1200;
-      background-color: #0f172a;
+      background-color: #090d16;
     }
     .map-overlay-ui {
       z-index: 1050;
@@ -115,18 +114,18 @@
 
     /* Solid high-contrast surfaces so map lines never bleed through */
     .solid-surface-dark {
-      background-color: #0f172a;
+      background-color: #090d16;
       border: 1px solid #334155;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.78);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.85);
     }
     .solid-surface-elevated {
-      background-color: #1e293b;
+      background-color: #111827;
       border: 1px solid #475569;
-      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.78);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.85);
     }
 
     .leaflet-control-attribution {
-      background: #0f172a !important;
+      background: #090d16 !important;
       color: #cbd5e1 !important;
       font-size: 9px !important;
       padding: 2px 6px !important;
@@ -141,7 +140,7 @@
       color: #f8fafc !important;
       border: 1.5px solid #475569 !important;
       border-radius: 16px !important;
-      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.9) !important;
+      box-shadow: 0 14px 30px rgba(0, 0, 0, 0.92) !important;
       padding: 0 !important;
     }
     .leaflet-popup-content {
@@ -181,7 +180,7 @@
       height: 6px;
     }
     ::-webkit-scrollbar-track {
-      background: #0f172a;
+      background: #090d16;
     }
     ::-webkit-scrollbar-thumb {
       background: #475569;
@@ -189,71 +188,80 @@
     }
   </style>
 </head>
-<body class="flex flex-col h-dvh overflow-hidden bg-[#0f172a] text-slate-100" lang="ja">
+<body class="flex flex-col h-dvh overflow-hidden bg-[#090d16] text-slate-100" lang="ja">
 
-  <!-- Top Header: Non-overlapping wrapped layout with opaque dark surfaces -->
-  <header class="app-header ui-lock-zoom bg-[#0f172a] border-b border-slate-700 px-2.5 pt-2 pb-2 shrink-0 shadow-lg">
-    <!-- Row 1: Status & Action Pills (wraps cleanly on narrow mobile screens without overlapping) -->
-    <div class="flex flex-wrap items-center gap-1.5">
-      <div id="gnss-badge" class="inline-flex items-center gap-1.5 min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 shrink-0">
-        <span id="gnss-dot" class="w-2.5 h-2.5 rounded-full bg-slate-400 shrink-0"></span>
-        <span id="gnss-status" class="text-[11px] font-extrabold text-slate-100 whitespace-nowrap">GPS測位中</span>
-        <span id="gnss-acc" class="text-xs font-black tabular-nums text-white whitespace-nowrap">--m</span>
+  <!-- Top Header: Minimal strip on launch (topCollapsed = true), expandable drawer -->
+  <header class="app-header ui-lock-zoom bg-[#090d16] border-b border-slate-700 px-2.5 py-1.5 shrink-0 shadow-lg">
+    <!-- Minimal Always-Visible Strip -->
+    <div class="flex items-center justify-between gap-1.5">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <div id="gnss-badge" class="inline-flex items-center gap-1.5 min-h-[32px] px-2 py-0.5 rounded-xl bg-[#111827] border border-slate-600 shrink-0">
+          <span id="gnss-dot" class="w-2 h-2 rounded-full bg-slate-400 shrink-0"></span>
+          <span id="gnss-status" class="text-[11px] font-extrabold text-slate-100 whitespace-nowrap">GPS待機</span>
+          <span id="gnss-acc" class="text-[11px] font-black tabular-nums text-white whitespace-nowrap">--m</span>
+        </div>
+
+        <button id="btn-header-modified" type="button" class="inline-flex items-center justify-center min-h-[32px] px-2 py-0.5 rounded-xl bg-[#272012] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
+          修正:<span id="modified-count-num" class="ml-0.5">0</span>
+        </button>
+
+        <button id="btn-sync-now" type="button" class="inline-flex items-center justify-center min-h-[32px] px-2.5 py-0.5 rounded-xl bg-[#0c2d27] border border-emerald-400 text-[11px] font-black text-emerald-300 shrink-0 whitespace-nowrap active:scale-95" title="公開CSVから最新データを同期">
+          <span id="sync-label">同期</span>
+        </button>
       </div>
 
-      <button id="btn-header-modified" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#272012] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95" title="修正済み地点の一覧・シート反映画面を開く">
-        修正: <span id="modified-count-num" class="ml-0.5">0</span>件
-      </button>
-
-      <button id="btn-sync-now" type="button" class="inline-flex items-center justify-center min-h-[36px] px-3 py-1 rounded-xl bg-[#0c2d27] border border-emerald-400 text-[11px] font-black text-emerald-300 shrink-0 whitespace-nowrap active:scale-95" title="公開CSVから最新データを同期">
-        <span id="sync-label">同期</span>
-      </button>
-
-      <button id="btn-autopan-toggle" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-slate-200 shrink-0 whitespace-nowrap active:scale-95" title="GPS追従中の自動地図移動">
-        自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
-      </button>
-
-      <button id="btn-demo-toggle" type="button" class="inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-sky-400 shrink-0 whitespace-nowrap active:scale-95">
-        <span id="demo-label">デモ:OFF</span>
+      <button id="btn-top-collapse" type="button" class="inline-flex items-center justify-center min-h-[32px] px-2.5 py-0.5 rounded-xl bg-[#1e293b] border border-slate-500 text-[11px] font-black text-sky-300 shrink-0 whitespace-nowrap active:scale-95">
+        <span id="top-collapse-label">上部展開</span>
       </button>
     </div>
 
-    <!-- Row 2: Current Location & Heading -->
-    <div class="mt-1.5 flex items-center justify-between gap-2 text-[11px] text-slate-300">
-      <div class="tabular-nums truncate min-w-0">
+    <!-- Collapsible Top Drawer (Hidden on launch because topCollapsed = true) -->
+    <div id="top-collapsible-drawer" class="hidden mt-1.5 pt-1.5 border-t border-slate-800 space-y-1.5">
+      <div class="flex flex-wrap items-center gap-1.5">
+        <button id="btn-autopan-toggle" type="button" class="inline-flex items-center justify-center min-h-[34px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-slate-200 shrink-0 whitespace-nowrap active:scale-95" title="GPS追従中の自動地図移動">
+          自動移動:<span id="autopan-label" class="text-sky-400 font-black ml-0.5">OFF</span>
+        </button>
+
+        <button id="btn-demo-toggle" type="button" class="inline-flex items-center justify-center min-h-[34px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-bold text-sky-400 shrink-0 whitespace-nowrap active:scale-95">
+          <span id="demo-label">デモ:OFF</span>
+        </button>
+
+        <div class="tabular-nums text-[11px] bg-[#111827] border border-slate-700 px-2 py-1 rounded-xl shrink-0">
+          方位:<span id="heading-display" class="text-sky-400 font-black ml-0.5">--°</span>
+        </div>
+      </div>
+
+      <div class="tabular-nums truncate text-[11px] text-slate-300 bg-[#111827] border border-slate-800 rounded-xl px-2.5 py-1">
         現在地: <span id="coords-display" class="text-white font-bold">取得確認中（新発田市周辺）</span>
       </div>
-      <div class="tabular-nums shrink-0 whitespace-nowrap bg-[#1e293b] border border-slate-700 px-2 py-0.5 rounded-lg">
-        方位: <span id="heading-display" class="text-sky-400 font-black">--°</span>
-      </div>
-    </div>
 
-    <!-- Storage Warning Banner (shown only above ~75% of 4.5MB budget) -->
-    <div id="storage-warning-banner" class="hidden mt-1.5 bg-[#451a03] border border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
-      <div class="text-amber-100 font-bold truncate">
-        保存容量使用率 <span id="storage-warn-pct" class="font-black text-amber-300 tabular-nums">--%</span>。キャッシュ整理を推奨
-      </div>
-      <button id="btn-banner-cleanup" type="button" class="shrink-0 min-h-[32px] px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px] whitespace-nowrap active:scale-95">
-        キャッシュ整理
-      </button>
-    </div>
-
-    <!-- Row 3: Type Filter Chips & Municipality Selector -->
-    <div class="mt-1.5 flex flex-wrap items-center justify-between gap-1.5">
-      <div id="filter-chips" class="flex flex-wrap items-center gap-1.5">
-        <button type="button" data-filter="all" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap">すべて</button>
-        <button type="button" data-filter="underground" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
-          <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-white inline-block shrink-0"></span>地下
+      <!-- Storage Warning Banner (shown only above ~75% of 4.5MB budget) -->
+      <div id="storage-warning-banner" class="hidden bg-[#451a03] border border-amber-400 rounded-xl px-2.5 py-1.5 flex items-center justify-between gap-2 text-[11px]">
+        <div class="text-amber-100 font-bold truncate">
+          保存容量使用率 <span id="storage-warn-pct" class="font-black text-amber-300 tabular-nums">--%</span>。キャッシュ整理を推奨
+        </div>
+        <button id="btn-banner-cleanup" type="button" class="shrink-0 min-h-[32px] px-2.5 py-1 rounded-lg bg-amber-400 text-slate-950 font-black text-[11px] whitespace-nowrap active:scale-95">
+          キャッシュ整理
         </button>
-        <button type="button" data-filter="aboveground" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
-          <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 border border-white inline-block shrink-0"></span>地上
-        </button>
-        <button type="button" data-filter="modified" class="min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap">修正済</button>
       </div>
 
-      <select id="city-select" aria-label="市町村フィルタ" class="min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-white font-bold shrink-0 max-w-[135px] truncate">
-        <option value="all">全市町村</option>
-      </select>
+      <!-- Type Filter Chips & Municipality Selector -->
+      <div class="flex flex-wrap items-center justify-between gap-1.5">
+        <div id="filter-chips" class="flex flex-wrap items-center gap-1.5">
+          <button type="button" data-filter="all" class="min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap">すべて</button>
+          <button type="button" data-filter="underground" class="min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+            <span class="w-2.5 h-2.5 rounded-full bg-cyan-400 border border-white inline-block shrink-0"></span>地下
+          </button>
+          <button type="button" data-filter="aboveground" class="min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap">
+            <span class="w-2.5 h-2.5 rounded-sm bg-rose-500 border border-white inline-block shrink-0"></span>地上
+          </button>
+          <button type="button" data-filter="modified" class="min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap">修正済</button>
+        </div>
+
+        <select id="city-select" aria-label="市町村フィルタ" class="min-h-[34px] px-2 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-white font-bold shrink-0 max-w-[132px] truncate">
+          <option value="all">全市町村</option>
+        </select>
+      </div>
     </div>
   </header>
 
@@ -262,22 +270,22 @@
     <div id="leaflet-map"></div>
 
     <!-- Top-Left Target HUD (Solid Opaque Dark Surface) -->
-    <div id="target-hud" class="map-overlay-ui ui-lock-zoom solid-surface-dark absolute top-2.5 left-2.5 px-3 py-2 rounded-2xl pointer-events-none max-w-[162px]">
+    <div id="target-hud" class="map-overlay-ui ui-lock-zoom solid-surface-dark absolute top-2 left-2 px-2.5 py-1.5 rounded-xl pointer-events-none max-w-[146px]">
       <div class="flex items-center gap-1">
-        <span class="text-[10px] font-extrabold text-slate-300">ターゲット距離</span>
+        <span class="text-[10px] font-extrabold text-slate-300">ターゲット</span>
         <span id="arrival-badge" class="hidden px-1.5 py-0.5 rounded bg-emerald-500 text-slate-950 text-[10px] font-black">至近圏</span>
       </div>
-      <div class="flex items-baseline gap-1 mt-0.5">
-        <span id="hud-dist" class="text-2xl sm:text-3xl font-black text-white tabular-nums">--</span>
-        <span class="text-xs font-bold text-slate-200">m</span>
+      <div class="flex items-baseline gap-0.5 mt-0.5">
+        <span id="hud-dist" class="text-xl sm:text-2xl font-black text-white tabular-nums">--</span>
+        <span class="text-[11px] font-bold text-slate-200">m</span>
       </div>
-      <div class="text-[11px] font-extrabold text-sky-400 tabular-nums">
-        方位 <span id="hud-bearing">--°</span> (<span id="hud-rel">--</span>)
+      <div class="text-[10px] font-extrabold text-sky-400 tabular-nums truncate">
+        <span id="hud-bearing">--°</span> (<span id="hud-rel">--</span>)
       </div>
     </div>
 
     <!-- Relocation Mode Banner (Solid Opaque Amber Surface) -->
-    <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2.5 left-2.5 right-2.5 bg-[#451a03] border-2 border-amber-400 rounded-2xl p-3 shadow-2xl pointer-events-auto">
+    <div id="relocate-panel" class="map-relocate-ui ui-lock-zoom hidden absolute top-2 left-2 right-2 bg-[#451a03] border-2 border-amber-400 rounded-2xl p-2.5 shadow-2xl pointer-events-auto">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div class="text-xs font-black text-amber-300 truncate">
@@ -287,41 +295,37 @@
             黄色ピンをドラッグ、または地図をタップして位置を指定
           </p>
         </div>
-        <div id="relocate-shift" class="px-2.5 py-1 rounded-xl bg-[#0f172a] border border-amber-400 text-xs font-black text-amber-300 tabular-nums shrink-0">
+        <div id="relocate-shift" class="px-2.5 py-1 rounded-xl bg-[#090d16] border border-amber-400 text-xs font-black text-amber-300 tabular-nums shrink-0">
           0.0m
         </div>
       </div>
-      <div class="mt-2.5 grid grid-cols-3 gap-1.5">
-        <button id="btn-relocate-gps" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
+      <div class="mt-2 grid grid-cols-3 gap-1.5">
+        <button id="btn-relocate-gps" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-sky-500 text-slate-950 font-black text-xs active:scale-95">
           現在地GPS反映
         </button>
-        <button id="btn-relocate-save" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs active:scale-95">
+        <button id="btn-relocate-save" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-emerald-500 text-slate-950 font-black text-xs active:scale-95">
           位置を確定
         </button>
-        <button id="btn-relocate-cancel" type="button" class="min-h-[40px] py-2 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-slate-100 font-bold text-xs active:scale-95">
+        <button id="btn-relocate-cancel" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-slate-100 font-bold text-xs active:scale-95">
           取消
         </button>
       </div>
     </div>
 
     <!-- Top-Right Map Controls & Solid Opaque Count Badge -->
-    <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-2.5 right-2.5 flex flex-col items-end gap-1.5 pointer-events-none max-w-[54vw]">
-      <div id="viewport-badge" class="px-2.5 py-1.5 rounded-xl bg-[#0f172a] border border-emerald-400/80 text-[11px] font-black text-emerald-300 shadow-[0_6px_16px_rgba(0,0,0,0.85)] tabular-nums pointer-events-none text-right leading-tight">
+    <div id="map-controls-right" class="map-overlay-ui ui-lock-zoom absolute top-2 right-2 flex flex-col items-end gap-1.5 pointer-events-none max-w-[56vw]">
+      <div id="viewport-badge" class="px-2 py-1 rounded-xl bg-[#090d16] border border-emerald-400/80 text-[10px] font-black text-emerald-300 shadow-[0_6px_16px_rgba(0,0,0,0.9)] tabular-nums pointer-events-none text-right leading-tight">
         表示: 0 / 範囲内0件 (全0件)
       </div>
 
-      <button id="btn-layer-cycle" type="button" class="pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-xl bg-[#111827] border border-slate-500 text-xs font-extrabold text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center gap-1.5 whitespace-nowrap active:scale-95">
+      <button id="btn-layer-cycle" type="button" class="pointer-events-auto min-h-[34px] px-2.5 py-1 rounded-xl bg-[#111827] border border-slate-500 text-[11px] font-extrabold text-white shadow-[0_6px_16px_rgba(0,0,0,0.9)] flex items-center gap-1 whitespace-nowrap active:scale-95">
         <span class="text-sky-400">地図:</span>
         <span id="layer-name">標準地図</span>
-      </button>
-
-      <button id="btn-center-user" type="button" class="pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-xl bg-[#111827] border border-slate-500 text-xs font-extrabold text-sky-300 shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center gap-1 whitespace-nowrap active:scale-95">
-        <span>現在地へ移動</span>
       </button>
     </div>
 
     <!-- Bottom-Left Virtual Movement Pad (Demo Mode Only) -->
-    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-20 left-3 bg-[#0f172a] border border-sky-400 p-2 rounded-2xl shadow-2xl pointer-events-auto">
+    <div id="demo-pad" class="map-overlay-ui ui-lock-zoom hidden absolute bottom-16 left-2.5 bg-[#090d16] border border-sky-400 p-2 rounded-2xl shadow-2xl pointer-events-auto">
       <div class="text-[10px] font-bold text-sky-400 text-center mb-1">仮想移動テスト</div>
       <div class="grid grid-cols-3 gap-1 w-32">
         <div></div>
@@ -331,88 +335,97 @@
         <button type="button" data-move="acc" class="p-1.5 bg-[#1e293b] rounded-lg text-[10px] font-bold text-amber-300 active:bg-slate-600">誤差</button>
         <button type="button" data-move="e" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">東→</button>
         <div></div>
-        <button type="button" data-move="s" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:bg-slate-600">↓南</button>
+        <button type="button" data-move="s" class="p-1.5 bg-[#1e293b] rounded-lg text-xs font-bold text-white active:scale-95">↓南</button>
         <div></div>
       </div>
     </div>
 
-    <!-- Bottom-Left Large High-Visibility AR Button -->
-    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 left-3 right-16 flex items-center pointer-events-none">
-      <button id="btn-open-ar" type="button" class="pointer-events-auto w-full max-w-[272px] min-h-[54px] px-4 py-2.5 rounded-2xl bg-gradient-to-r from-amber-400 via-amber-300 to-sky-400 text-slate-950 font-black text-sm sm:text-base border-2 border-white shadow-[0_12px_28px_rgba(0,0,0,0.9)] flex items-center justify-center gap-2.5 active:scale-95">
-        <svg class="w-6 h-6 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <!-- Bottom-Left Compact Button Group: AR & GPS追従 Side-by-Side -->
+    <div class="map-overlay-ui ui-lock-zoom absolute bottom-2.5 left-2.5 flex items-center gap-1.5 pointer-events-auto">
+      <button id="btn-open-ar" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-gradient-to-r from-amber-400 to-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1.5 whitespace-nowrap active:scale-95">
+        <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M4 7V5a2 2 0 0 1 2-2h2" />
           <path d="M16 3h2a2 2 0 0 1 2 2v2" />
           <path d="M20 17v2a2 2 0 0 1-2 2h-2" />
           <path d="M8 21H6a2 2 0 0 1-2-2v-2" />
           <circle cx="12" cy="12" r="3" />
-          <path d="M12 2v2M12 20v2M2 12h2M20 12h2" />
         </svg>
-        <span>AR カメラ探索</span>
+        <span>AR</span>
+      </button>
+
+      <button id="btn-gps-watch" type="button" class="min-h-[38px] px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95">
+        <span id="gps-btn-label">GPS追従</span>
       </button>
     </div>
 
     <!-- Bottom-Right Zoom Controls (Solid Opaque Surfaces) -->
-    <div class="map-overlay-ui ui-lock-zoom absolute bottom-3 right-3 flex flex-col gap-2 pointer-events-auto">
-      <button id="btn-zoom-in" type="button" class="w-11 h-11 rounded-2xl bg-[#111827] border border-slate-500 text-lg font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
-      <button id="btn-zoom-out" type="button" class="w-11 h-11 rounded-2xl bg-[#111827] border border-slate-500 text-lg font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.85)] flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
+    <div class="map-overlay-ui ui-lock-zoom absolute bottom-2.5 right-2.5 flex flex-col gap-1.5 pointer-events-auto">
+      <button id="btn-zoom-in" type="button" class="w-9 h-9 rounded-xl bg-[#111827] border border-slate-500 text-base font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.9)] flex items-center justify-center active:scale-95" aria-label="拡大">＋</button>
+      <button id="btn-zoom-out" type="button" class="w-9 h-9 rounded-xl bg-[#111827] border border-slate-500 text-base font-black text-white shadow-[0_6px_16px_rgba(0,0,0,0.9)] flex items-center justify-center active:scale-95" aria-label="縮小">－</button>
     </div>
   </main>
 
-  <!-- Bottom Detail Drawer & Primary Action Bar -->
-  <footer class="app-footer ui-lock-zoom bg-[#0f172a] border-t border-slate-700 px-3 pt-2 pb-2.5 shrink-0 shadow-[0_-6px_22px_rgba(0,0,0,0.75)]">
-    <div class="bg-[#111827] border border-slate-700 rounded-2xl p-2.5 mb-2">
-      <div class="flex items-center gap-1.5 flex-wrap">
-        <span id="detail-no" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#0c2d48] text-sky-300 border border-sky-500/60 tabular-nums">No.--</span>
-        <span id="detail-type" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#083344] text-cyan-300 border border-cyan-500/60">地下式</span>
-        <span id="detail-spec" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e293b] text-slate-200 border border-slate-600">--</span>
-        <span id="detail-grid" class="hidden px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e1b4b] text-indigo-300 border border-indigo-500/60 tabular-nums">--</span>
-        <span id="detail-mod" class="hidden px-2 py-0.5 rounded-md text-[11px] font-black bg-[#451a03] text-amber-300 border border-amber-400">修正済</span>
+  <!-- Bottom Strip & Collapsible Detail Drawer (bottomCollapsed = true on launch) -->
+  <footer class="app-footer ui-lock-zoom bg-[#090d16] border-t border-slate-700 px-2.5 py-1.5 shrink-0 shadow-[0_-6px_22px_rgba(0,0,0,0.85)]">
+    <!-- Minimal Always-Visible Bottom Bar -->
+    <div class="flex items-center justify-between gap-1.5">
+      <div class="min-w-0 flex-1 flex items-center gap-1.5">
+        <span id="detail-no" class="px-1.5 py-0.5 rounded bg-[#0c2d48] text-sky-300 border border-sky-500/60 text-[10px] font-black tabular-nums shrink-0">No.--</span>
+        <span id="detail-address" class="text-xs font-black text-white truncate">シンボルをタップして消火栓を選択</span>
       </div>
 
-      <h1 id="detail-address" class="text-sm sm:text-base font-black text-white mt-1 truncate">
-        シンボルをタップして消火栓を選択
-      </h1>
-
-      <div class="mt-1.5 bg-[#1e293b] border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
-        <div class="min-w-0 flex-1">
-          <div class="text-[10px] font-extrabold text-amber-300">位置メモ・目印</div>
-          <div id="detail-memo" class="text-xs font-black text-white truncate">--</div>
-        </div>
-        <button id="btn-copy-one-tsv" type="button" class="hidden shrink-0 min-h-[34px] px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
-          行TSVコピー
+      <div class="flex items-center gap-1 shrink-0">
+        <button id="btn-nearest" type="button" class="min-h-[34px] px-2.5 py-1 rounded-xl bg-emerald-500 text-slate-950 text-[11px] font-black whitespace-nowrap active:scale-95">
+          最寄り
         </button>
-      </div>
-
-      <div class="mt-2 grid grid-cols-3 gap-1.5">
-        <a id="btn-sv-link" href="#" target="_blank" rel="noopener noreferrer" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#064e3b] border border-emerald-400 text-[11px] font-black text-emerald-200 flex items-center justify-center gap-1 text-center active:scale-95">
-          ストリートビュー
-        </a>
-        <button id="btn-relocate-start" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-200 flex items-center justify-center gap-1 active:scale-95">
-          地図で位置修正
+        <button id="btn-open-list" type="button" class="min-h-[34px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-white text-[11px] font-black whitespace-nowrap active:scale-95">
+          一覧/読込
         </button>
-        <button id="btn-edit-sheet" type="button" class="min-h-[38px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-[11px] font-bold text-slate-100 flex items-center justify-center gap-1 active:scale-95">
-          数値/メモ編集
+        <button id="btn-bottom-collapse" type="button" class="min-h-[34px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-500 text-sky-300 text-[11px] font-black whitespace-nowrap active:scale-95">
+          <span id="bottom-collapse-label">詳細開く</span>
         </button>
       </div>
     </div>
 
-    <div class="grid grid-cols-3 gap-2">
-      <button id="btn-gps-watch" type="button" class="glove-btn bg-sky-500 hover:bg-sky-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg">
-        <span id="gps-btn-label">GPS追従開始</span>
-      </button>
-      <button id="btn-nearest" type="button" class="glove-btn bg-emerald-500 hover:bg-emerald-400 text-slate-950 text-xs sm:text-sm px-2 shadow-lg">
-        最寄り選択
-      </button>
-      <button id="btn-open-list" type="button" class="glove-btn bg-[#1e293b] hover:bg-slate-700 text-white border border-slate-500 text-xs sm:text-sm px-2">
-        一覧 / 読込
-      </button>
+    <!-- Collapsible Bottom Detail Drawer (Hidden on launch because bottomCollapsed = true) -->
+    <div id="bottom-collapsible-drawer" class="hidden mt-1.5 pt-1.5 border-t border-slate-800">
+      <div class="bg-[#111827] border border-slate-700 rounded-2xl p-2.5">
+        <div class="flex items-center gap-1.5 flex-wrap">
+          <span id="detail-type" class="px-2 py-0.5 rounded-md text-[11px] font-black bg-[#083344] text-cyan-300 border border-cyan-500/60">地下式</span>
+          <span id="detail-spec" class="px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e293b] text-slate-200 border border-slate-600">--</span>
+          <span id="detail-grid" class="hidden px-2 py-0.5 rounded-md text-[11px] font-bold bg-[#1e1b4b] text-indigo-300 border border-indigo-500/60 tabular-nums">--</span>
+          <span id="detail-mod" class="hidden px-2 py-0.5 rounded-md text-[11px] font-black bg-[#451a03] text-amber-300 border border-amber-400">修正済</span>
+        </div>
+
+        <div class="mt-1.5 bg-[#1e293b] border-l-4 border-amber-400 rounded-r-xl px-2.5 py-1.5 flex items-center justify-between gap-2">
+          <div class="min-w-0 flex-1">
+            <div class="text-[10px] font-extrabold text-amber-300">位置メモ・目印</div>
+            <div id="detail-memo" class="text-xs font-black text-white truncate">--</div>
+          </div>
+          <button id="btn-copy-one-tsv" type="button" class="hidden shrink-0 min-h-[34px] px-2.5 py-1 rounded-xl bg-amber-400 text-slate-950 text-[11px] font-black active:scale-95">
+            行TSVコピー
+          </button>
+        </div>
+
+        <div class="mt-2 grid grid-cols-3 gap-1.5">
+          <a id="btn-sv-link" href="#" target="_blank" rel="noopener noreferrer" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-[#064e3b] border border-emerald-400 text-[11px] font-black text-emerald-200 flex items-center justify-center gap-1 text-center active:scale-95">
+            ストリートビュー
+          </a>
+          <button id="btn-relocate-start" type="button" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-200 flex items-center justify-center gap-1 active:scale-95">
+            地図で位置修正
+          </button>
+          <button id="btn-edit-sheet" type="button" class="min-h-[36px] py-1.5 px-2 rounded-xl bg-[#1e293b] border border-slate-500 text-[11px] font-bold text-slate-100 flex items-center justify-center gap-1 active:scale-95">
+            数値/メモ編集
+          </button>
+        </div>
+      </div>
     </div>
   </footer>
 
   <!-- Full-Screen AR Camera Overlay -->
   <div id="ar-overlay" class="ar-overlay-ui ui-lock-zoom hidden fixed inset-0 bg-[#050811] flex flex-col justify-between overflow-hidden">
     <video id="ar-video" autoplay playsinline muted class="absolute inset-0 w-full h-full object-cover opacity-85"></video>
-    <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#0f172a] to-[#050811] pointer-events-none"></div>
+    <div id="ar-no-camera-bg" class="absolute inset-0 bg-gradient-to-b from-[#0b1324] via-[#090d16] to-[#050811] pointer-events-none"></div>
 
     <!-- Ground Horizon & Sightline -->
     <div class="pointer-events-none absolute inset-0 overflow-hidden">
@@ -425,11 +438,11 @@
 
     <!-- Off-Screen Directional Guides -->
     <div id="ar-offscreen-guides" class="pointer-events-none absolute inset-x-2 top-28 flex items-center justify-between z-10">
-      <button id="ar-guide-left" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#0f172a] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+      <button id="ar-guide-left" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#090d16] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
         ◀ 左方角へ
       </button>
       <div class="flex-1"></div>
-      <button id="ar-guide-right" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#0f172a] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
+      <button id="ar-guide-right" type="button" class="hidden pointer-events-auto min-h-[38px] px-3 py-1.5 rounded-2xl bg-[#090d16] border-2 border-amber-400 text-amber-300 text-xs font-black shadow-xl active:scale-95">
         右方角へ ▶
       </button>
     </div>
@@ -438,8 +451,8 @@
     <div id="ar-targets-layer" class="pointer-events-none absolute inset-x-0 top-24 bottom-44 overflow-hidden z-[5]"></div>
 
     <!-- Top AR Bar (Solid Opaque Surfaces & Wrapped Controls) -->
-    <div class="relative z-20 p-2.5 bg-[#0f172a] border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
-      <div class="bg-[#1e293b] border border-slate-600 rounded-xl px-2.5 py-1.5 min-w-0 flex-1">
+    <div class="relative z-20 p-2.5 bg-[#090d16] border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
+      <div class="bg-[#111827] border border-slate-600 rounded-xl px-2.5 py-1.5 min-w-0 flex-1">
         <div class="flex items-center gap-2 flex-wrap">
           <span class="text-xs font-black text-amber-300">AR探索</span>
           <span id="ar-heading-readout" class="text-xs font-black text-sky-300 tabular-nums">方位 0°</span>
@@ -497,7 +510,7 @@
     </div>
 
     <!-- Bottom AR Heading Control & Selected Target Card (Solid Opaque Surfaces) -->
-    <div class="relative z-20 p-3 bg-[#0f172a] border-t border-slate-700 space-y-2">
+    <div class="relative z-20 p-3 bg-[#090d16] border-t border-slate-700 space-y-2">
       <div id="ar-selected-card" class="bg-[#111827] border border-amber-400 rounded-2xl p-2.5 flex items-center justify-between gap-2">
         <div class="min-w-0">
           <div id="ar-sel-meta" class="text-[11px] font-bold text-amber-300 tabular-nums">対象未選択</div>
@@ -523,7 +536,7 @@
   </div>
 
   <!-- Modal 1: Nearby / Viewport List -->
-  <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#0b101b]/95 flex flex-col p-3">
+  <div id="modal-list" class="app-modal hidden fixed inset-0 bg-[#050811]/95 flex flex-col p-3">
     <div class="bg-[#111827] border border-slate-600 rounded-2xl flex flex-col w-full max-w-lg mx-auto h-full max-h-[92vh] overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-700 flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -543,7 +556,7 @@
         </div>
       </div>
 
-      <div class="p-3 border-b border-slate-700 bg-[#0f172a] space-y-2">
+      <div class="p-3 border-b border-slate-700 bg-[#090d16] space-y-2">
         <input id="list-search" type="text" placeholder="住所・地番・番号・位置メモ・グリッドで検索..." class="w-full px-3.5 py-2.5 rounded-xl bg-[#1e293b] border border-slate-600 text-white focus:outline-none focus:border-sky-400">
         <div class="flex flex-wrap items-center justify-between gap-2">
           <label class="flex items-center gap-1.5 text-xs font-bold text-emerald-300 cursor-pointer">
@@ -559,7 +572,7 @@
   </div>
 
   <!-- Modal 2: 13-Column Import / Fine Edit / Modified Hydrants Sheet Sync Manager -->
-  <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#0b101b]/95 flex flex-col p-2.5 sm:p-4 overflow-y-auto">
+  <div id="modal-data" class="app-modal hidden fixed inset-0 bg-[#050811]/95 flex flex-col p-2.5 sm:p-4 overflow-y-auto">
     <div class="bg-[#111827] border border-slate-600 rounded-2xl flex flex-col w-full max-w-xl mx-auto my-auto overflow-hidden shadow-2xl">
       <div class="p-3.5 border-b border-slate-700 flex items-center justify-between">
         <h2 id="data-modal-title" class="text-base font-black text-white">データ同期・編集・修正一覧管理</h2>
@@ -568,7 +581,7 @@
         </button>
       </div>
 
-      <div class="grid grid-cols-4 gap-1 bg-[#0f172a] p-1.5 border-b border-slate-700">
+      <div class="grid grid-cols-4 gap-1 bg-[#090d16] p-1.5 border-b border-slate-700">
         <button type="button" id="tab-modified" class="min-h-[38px] py-1.5 rounded-lg text-[11px] font-black bg-amber-400 text-slate-950">
           修正一覧 (<span id="tab-mod-count">0</span>)
         </button>
@@ -605,7 +618,7 @@
 
         <!-- Tab 2: Published CSV Sync & Import -->
         <div id="pane-import" class="hidden space-y-3.5">
-          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
+          <div class="bg-[#090d16] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <span class="text-xs font-black text-sky-400">公開スプレッドシート CSV URL（自動同期対象）</span>
               <span id="last-sync-status" class="text-[10px] text-slate-300 tabular-nums">未同期</span>
@@ -625,7 +638,7 @@
           </div>
 
           <!-- Storage Budget & Cache Cleanup -->
-          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
+          <div class="bg-[#090d16] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="flex items-center justify-between gap-2">
               <span class="text-xs font-black text-emerald-300">端末保存容量（4.5MB目安）</span>
               <span id="storage-budget-detail" class="text-[11px] font-bold text-slate-200 tabular-nums">-- KB (--%)</span>
@@ -635,7 +648,7 @@
             </button>
           </div>
 
-          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
+          <div class="bg-[#090d16] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-amber-300">スプレッドシート行を貼り付け（TSV / CSV・13列）</div>
             <p class="text-[10px] text-slate-300">
               1:番号 / 2:住所・地番 / 3:緯度 / 4:経度 / 5:市町村 / 6:位置メモ / 7:種別 / 8:規模 / 9:口径 / 10:備考 / 11:標識 / 12:地図グリッド / 13:SV URL
@@ -646,7 +659,7 @@
             </button>
           </div>
 
-          <div class="bg-[#0f172a] border border-slate-700 p-3 rounded-xl space-y-2">
+          <div class="bg-[#090d16] border border-slate-700 p-3 rounded-xl space-y-2">
             <div class="text-xs font-black text-emerald-300">CSV / TSVファイルを選択して読込</div>
             <input id="file-upload-input" type="file" accept=".csv,.tsv,.txt,text/csv,text/tab-separated-values" class="w-full text-xs text-slate-200 file:mr-3 file:py-2 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-black file:bg-emerald-500 file:text-slate-950">
           </div>
@@ -668,15 +681,15 @@
             <div class="grid grid-cols-3 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-slate-200 mb-1">1: 番号</label>
-                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
+                <input id="edit-no" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-200 mb-1">5: 市町村</label>
-                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
+                <input id="edit-city" type="text" class="w-full px-2.5 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-slate-200 mb-1">7: 種別</label>
-                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white font-bold">
+                <select id="edit-type" class="w-full px-2 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white font-bold">
                   <option value="地下式">地下式</option>
                   <option value="地上式">地上式</option>
                   <option value="防火水槽">防火水槽</option>
@@ -687,52 +700,52 @@
 
             <div>
               <label class="block text-[11px] font-bold text-slate-200 mb-1">2: 住所・地番（必須）</label>
-              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
+              <input id="edit-address" type="text" required class="w-full px-3 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white">
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">3: 緯度 (Lat)</label>
-                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
+                <input id="edit-lat" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[11px] font-bold text-sky-400 mb-1">4: 経度 (Lon)</label>
-                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white tabular-nums">
+                <input id="edit-lon" type="number" step="any" required class="w-full px-3 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white tabular-nums">
               </div>
             </div>
 
             <div>
               <label class="block text-[11px] font-bold text-amber-300 mb-1">6: 位置メモ・目印（積雪期の基準点・オフセット）</label>
-              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#0f172a] border border-slate-600 text-white">
+              <input id="edit-memo" type="text" class="w-full px-3 py-2 rounded-xl bg-[#090d16] border border-slate-600 text-white">
             </div>
 
             <div class="grid grid-cols-4 gap-1.5">
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">8: 規模</label>
-                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
+                <input id="edit-scale" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">9: 口径</label>
-                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white tabular-nums">
+                <input id="edit-diameter" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white tabular-nums">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">11: 標識</label>
-                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
+                <input id="edit-sign" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">12: グリッド</label>
-                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white tabular-nums">
+                <input id="edit-grid" type="text" class="w-full px-2 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white tabular-nums">
               </div>
             </div>
 
             <div class="grid grid-cols-2 gap-2">
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">10: 備考</label>
-                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
+                <input id="edit-remarks" type="text" class="w-full px-2.5 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white">
               </div>
               <div>
                 <label class="block text-[10px] text-slate-300 mb-1">13: SV URL</label>
-                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#0f172a] border border-slate-600 text-white">
+                <input id="edit-sv" type="url" class="w-full px-2.5 py-1.5 rounded-lg bg-[#090d16] border border-slate-600 text-white">
               </div>
             </div>
 
@@ -766,7 +779,7 @@
   </div>
 
   <!-- Toast Container -->
-  <div id="toast-box" class="app-toast ui-lock-zoom fixed top-28 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-1.5 w-[92%] max-w-sm"></div>
+  <div id="toast-box" class="app-toast ui-lock-zoom fixed top-14 left-1/2 -translate-x-1/2 pointer-events-none flex flex-col items-center gap-1.5 w-[92%] max-w-sm"></div>
 
   <script>
     (function () {
@@ -956,13 +969,15 @@
       ];
 
       // =====================================================================
-      // アプリケーション状態
+      // アプリケーション状態（起動時は上下とも収納状態 topCollapsed/bottomCollapsed = true）
       // =====================================================================
       const state = {
         hydrants: [],
         selectedId: null,
         filterType: 'all',
         filterCity: 'all',
+        topCollapsed: true,
+        bottomCollapsed: true,
         autoPanOnTrack: false,
         isDemo: false,
         isSyncing: false,
@@ -1024,6 +1039,9 @@
         modifiedCountNum: $('modified-count-num'),
         btnSyncNow: $('btn-sync-now'),
         syncLabel: $('sync-label'),
+        btnTopCollapse: $('btn-top-collapse'),
+        topCollapseLabel: $('top-collapse-label'),
+        topCollapsibleDrawer: $('top-collapsible-drawer'),
         btnAutopanToggle: $('btn-autopan-toggle'),
         autopanLabel: $('autopan-label'),
         btnDemoToggle: $('btn-demo-toggle'),
@@ -1050,11 +1068,15 @@
         viewportBadge: $('viewport-badge'),
         btnLayerCycle: $('btn-layer-cycle'),
         layerName: $('layer-name'),
-        btnCenterUser: $('btn-center-user'),
         btnZoomIn: $('btn-zoom-in'),
         btnZoomOut: $('btn-zoom-out'),
         demoPad: $('demo-pad'),
         btnOpenAr: $('btn-open-ar'),
+        btnGpsWatch: $('btn-gps-watch'),
+        gpsBtnLabel: $('gps-btn-label'),
+        btnBottomCollapse: $('btn-bottom-collapse'),
+        bottomCollapseLabel: $('bottom-collapse-label'),
+        bottomCollapsibleDrawer: $('bottom-collapsible-drawer'),
         detailNo: $('detail-no'),
         detailType: $('detail-type'),
         detailSpec: $('detail-spec'),
@@ -1066,8 +1088,6 @@
         btnSvLink: $('btn-sv-link'),
         btnRelocateStart: $('btn-relocate-start'),
         btnEditSheet: $('btn-edit-sheet'),
-        btnGpsWatch: $('btn-gps-watch'),
-        gpsBtnLabel: $('gps-btn-label'),
         btnNearest: $('btn-nearest'),
         btnOpenList: $('btn-open-list'),
         arOverlay: $('ar-overlay'),
@@ -1160,7 +1180,7 @@
       function showToast(msg, tone = 'info') {
         if (!dom.toastBox) return;
         const styleMap = {
-          info: 'bg-[#0f172a] border-sky-400 text-white',
+          info: 'bg-[#090d16] border-sky-400 text-white',
           success: 'bg-[#064e3b] border-emerald-400 text-emerald-100',
           warn: 'bg-[#451a03] border-amber-400 text-amber-100',
           error: 'bg-[#4c0519] border-rose-400 text-rose-100'
@@ -1987,6 +2007,7 @@
           }
         });
 
+        syncCollapseDrawersUI();
         syncToggleButtonsUI();
         renderViewportMarkers();
       }
@@ -2000,7 +2021,7 @@
         const half = boxSize / 2;
 
         const modDot = h.modified
-          ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #0f172a;box-shadow:0 1px 3px rgba(0,0,0,0.85);"></span>`
+          ? `<span style="position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:9999px;background:#facc15;border:1.5px solid #090d16;box-shadow:0 1px 3px rgba(0,0,0,0.85);"></span>`
           : '';
 
         const outerBorder = isSelected ? '2.5px solid #facc15' : '2px solid #ffffff';
@@ -2057,7 +2078,7 @@
               align-items:center;
               justify-content:center;
             ">
-              <span style="width:6px;height:6px;border-radius:2px;background:#0f172a;"></span>
+              <span style="width:6px;height:6px;border-radius:2px;background:#090d16;"></span>
               ${modDot}
             </div>
           `;
@@ -2176,13 +2197,13 @@
                 height:28px;
                 border-radius:9999px;
                 background:#facc15;
-                border:3px solid #0f172a;
+                border:3px solid #090d16;
                 box-shadow:0 0 0 2px #facc15, 0 4px 12px rgba(0,0,0,0.85);
                 display:flex;
                 align-items:center;
                 justify-content:center;
               ">
-                <span style="width:8px;height:8px;border-radius:9999px;background:#0f172a;"></span>
+                <span style="width:8px;height:8px;border-radius:9999px;background:#090d16;"></span>
               </div>`
             })
           }).addTo(mapRef.relocateGroup);
@@ -2494,7 +2515,7 @@
         if (visiblePins.length === 0) {
           const emptyNote = document.createElement('div');
           emptyNote.className =
-            'mx-auto mt-10 w-fit px-4 py-2 rounded-2xl bg-[#0f172a] border border-slate-600 text-xs font-bold text-slate-200 shadow-xl';
+            'mx-auto mt-10 w-fit px-4 py-2 rounded-2xl bg-[#090d16] border border-slate-600 text-xs font-bold text-slate-200 shadow-xl';
           emptyNote.textContent = `前方（±${AR_CONFIG.fovHalfDeg}°・${maxDist}m以内）に該当水利はありません`;
           dom.arTargetsLayer.appendChild(emptyNote);
           return;
@@ -2539,7 +2560,7 @@
 
           pinEl.innerHTML = `
             <div class="px-2 py-1 rounded-xl border ${
-              isSel ? 'bg-amber-400 text-slate-950 border-white shadow-xl' : 'bg-[#0f172a] text-white border-slate-500 shadow-lg'
+              isSel ? 'bg-amber-400 text-slate-950 border-white shadow-xl' : 'bg-[#090d16] text-white border-slate-500 shadow-lg'
             } max-w-[148px] text-center">
               <div class="text-[11px] font-black tabular-nums leading-tight">${dist < 100 ? dist.toFixed(1) : Math.round(dist)}m</div>
               <div class="text-[10px] font-bold truncate leading-tight">${escapeHtml(getAddressPrimary(h))}</div>
@@ -2568,7 +2589,7 @@
       }
 
       // =====================================================================
-      // 起動時現在地取得（getCurrentPosition）＆ 間引き GPS watchPosition
+      // 起動時現在地取得（getCurrentPosition）＆ GPS追従（即座現在地中心＋watchPosition）
       // =====================================================================
       function applyAcceptedPosition(pos, { centerMap = false, minPanDist = 8.0 } = {}) {
         if (state.isDemo || !pos || !pos.coords) return false;
@@ -2591,7 +2612,7 @@
         if (centerMap && !state.relocate.active && mapRef.map) {
           state.lastPannedLat = lat;
           state.lastPannedLon = lon;
-          mapRef.map.setView([lat, lon], Math.max(mapRef.map.getZoom(), 16), { animate: false });
+          mapRef.map.setView([lat, lon], Math.max(mapRef.map.getZoom(), 17), { animate: false });
           renderViewportMarkers();
         } else if (state.autoPanOnTrack && !state.relocate.active && mapRef.map) {
           const panMoved =
@@ -2648,15 +2669,26 @@
         );
       }
 
+      function setGpsWatchButtonUI(isWatching) {
+        if (dom.gpsBtnLabel) {
+          dom.gpsBtnLabel.textContent = isWatching ? '追従中' : 'GPS追従';
+        }
+        if (dom.btnGpsWatch) {
+          if (isWatching) {
+            dom.btnGpsWatch.className =
+              'min-h-[38px] px-3 py-1.5 rounded-xl bg-[#0c2d48] text-sky-300 font-black text-xs border-2 border-sky-400 shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95';
+          } else {
+            dom.btnGpsWatch.className =
+              'min-h-[38px] px-3 py-1.5 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs border border-white shadow-[0_6px_18px_rgba(0,0,0,0.92)] flex items-center justify-center gap-1 whitespace-nowrap active:scale-95';
+          }
+        }
+      }
+
       function toggleGpsWatch() {
         if (state.watchId !== null) {
           navigator.geolocation.clearWatch(state.watchId);
           state.watchId = null;
-          if (dom.gpsBtnLabel) dom.gpsBtnLabel.textContent = 'GPS追従開始';
-          if (dom.btnGpsWatch) {
-            dom.btnGpsWatch.classList.remove('bg-[#0c2d48]', 'border', 'border-sky-400', 'text-sky-300');
-            dom.btnGpsWatch.classList.add('bg-sky-500', 'text-slate-950');
-          }
+          setGpsWatchButtonUI(false);
           showToast('GPS追従を停止しました', 'info');
           return;
         }
@@ -2667,13 +2699,31 @@
         }
 
         requestCompassIfNeeded();
+        setGpsWatchButtonUI(true);
 
-        if (dom.gpsBtnLabel) dom.gpsBtnLabel.textContent = '追従中（停止）';
-        if (dom.btnGpsWatch) {
-          dom.btnGpsWatch.classList.remove('bg-sky-500', 'text-slate-950');
-          dom.btnGpsWatch.classList.add('bg-[#0c2d48]', 'border', 'border-sky-400', 'text-sky-300');
-        }
-        showToast('GPS追従を開始しました', 'success');
+        // Immediately fetch and center on current location when turned ON
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            applyAcceptedPosition(pos, { centerMap: true });
+          },
+          () => {
+            if (state.userPos.lat !== null && state.userPos.lon !== null && mapRef.map && !state.relocate.active) {
+              state.lastPannedLat = state.userPos.lat;
+              state.lastPannedLon = state.userPos.lon;
+              mapRef.map.setView([state.userPos.lat, state.userPos.lon], Math.max(mapRef.map.getZoom(), 17), {
+                animate: false
+              });
+              renderViewportMarkers();
+            }
+          },
+          {
+            enableHighAccuracy: true,
+            maximumAge: 3000,
+            timeout: 8000
+          }
+        );
+
+        showToast('GPS追従を開始しました（現在地へ移動）', 'success');
 
         state.watchId = navigator.geolocation.watchPosition(
           (pos) => {
@@ -2799,6 +2849,22 @@
       // =====================================================================
       // UI更新・修正一覧マネージャ・モーダル制御
       // =====================================================================
+      function syncCollapseDrawersUI() {
+        if (dom.topCollapsibleDrawer) {
+          dom.topCollapsibleDrawer.classList.toggle('hidden', Boolean(state.topCollapsed));
+        }
+        if (dom.topCollapseLabel) {
+          dom.topCollapseLabel.textContent = state.topCollapsed ? '上部展開' : '上部収納';
+        }
+
+        if (dom.bottomCollapsibleDrawer) {
+          dom.bottomCollapsibleDrawer.classList.toggle('hidden', Boolean(state.bottomCollapsed));
+        }
+        if (dom.bottomCollapseLabel) {
+          dom.bottomCollapseLabel.textContent = state.bottomCollapsed ? '詳細開く' : '詳細畳む';
+        }
+      }
+
       function syncToggleButtonsUI() {
         if (dom.autopanLabel) {
           dom.autopanLabel.textContent = state.autoPanOnTrack ? 'ON' : 'OFF';
@@ -2818,10 +2884,10 @@
         if (dom.btnHeaderModified) {
           if (modTotal > 0) {
             dom.btnHeaderModified.className =
-              'inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
+              'inline-flex items-center justify-center min-h-[32px] px-2 py-0.5 rounded-xl bg-[#451a03] border border-amber-400 text-[11px] font-black text-amber-300 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
           } else {
             dom.btnHeaderModified.className =
-              'inline-flex items-center justify-center min-h-[36px] px-2.5 py-1 rounded-xl bg-[#1e293b] border border-slate-600 text-[11px] font-black text-slate-200 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
+              'inline-flex items-center justify-center min-h-[32px] px-2 py-0.5 rounded-xl bg-[#111827] border border-slate-600 text-[11px] font-black text-slate-200 tabular-nums shrink-0 whitespace-nowrap active:scale-95';
           }
         }
 
@@ -2833,15 +2899,15 @@
           }
           if (dom.gnssDot && dom.gnssStatus) {
             if (acc <= 5) {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-emerald-400 shrink-0';
+              dom.gnssDot.className = 'w-2 h-2 rounded-full bg-emerald-400 shrink-0';
               dom.gnssStatus.textContent = '高精度';
               dom.gnssStatus.className = 'text-[11px] font-black text-emerald-300 whitespace-nowrap';
             } else if (acc <= 15) {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-amber-400 shrink-0';
+              dom.gnssDot.className = 'w-2 h-2 rounded-full bg-amber-400 shrink-0';
               dom.gnssStatus.textContent = '標準';
               dom.gnssStatus.className = 'text-[11px] font-black text-amber-300 whitespace-nowrap';
             } else {
-              dom.gnssDot.className = 'w-2.5 h-2.5 rounded-full bg-rose-500 shrink-0';
+              dom.gnssDot.className = 'w-2 h-2 rounded-full bg-rose-500 shrink-0';
               dom.gnssStatus.textContent = '誤差広';
               dom.gnssStatus.className = 'text-[11px] font-black text-rose-300 whitespace-nowrap';
             }
@@ -3022,7 +3088,7 @@
           const btn = document.createElement('button');
           btn.type = 'button';
           btn.className = `w-full text-left p-3 rounded-2xl border transition-colors ${
-            h.id === state.selectedId ? 'bg-[#0c2d48] border-sky-400' : 'bg-[#0f172a] border-slate-700 hover:border-slate-500'
+            h.id === state.selectedId ? 'bg-[#0c2d48] border-sky-400' : 'bg-[#090d16] border-slate-700 hover:border-slate-500'
           }`;
           btn.innerHTML = `
             <div class="flex items-center justify-between gap-2">
@@ -3061,7 +3127,7 @@
         dom.modifiedListContainer.innerHTML = '';
         if (modRows.length === 0) {
           dom.modifiedListContainer.innerHTML = `
-            <div class="text-center text-slate-300 py-8 px-4 rounded-2xl bg-[#0f172a] border border-slate-700 text-xs leading-relaxed">
+            <div class="text-center text-slate-300 py-8 px-4 rounded-2xl bg-[#090d16] border border-slate-700 text-xs leading-relaxed">
               現在、未反映の修正済み地点はありません。<br>
               地図上のシンボルから「位置を修正」または「数値/メモ編集」を行うとここへ表示されます。
             </div>
@@ -3078,7 +3144,7 @@
           const shift = getEffectiveShiftMeters(h).toFixed(1);
 
           const card = document.createElement('div');
-          card.className = 'bg-[#0f172a] border border-amber-400/70 rounded-2xl p-3 space-y-2';
+          card.className = 'bg-[#090d16] border border-amber-400/70 rounded-2xl p-3 space-y-2';
           card.innerHTML = `
             <div class="flex items-start justify-between gap-2">
               <div class="min-w-0">
@@ -3284,6 +3350,32 @@
       // イベントバインド
       // =====================================================================
       function bindEvents() {
+        if (dom.btnTopCollapse) {
+          dom.btnTopCollapse.addEventListener('click', () => {
+            state.topCollapsed = !state.topCollapsed;
+            syncCollapseDrawersUI();
+            if (mapRef.map) {
+              setTimeout(() => {
+                mapRef.map.invalidateSize();
+                renderViewportMarkers();
+              }, 50);
+            }
+          });
+        }
+
+        if (dom.btnBottomCollapse) {
+          dom.btnBottomCollapse.addEventListener('click', () => {
+            state.bottomCollapsed = !state.bottomCollapsed;
+            syncCollapseDrawersUI();
+            if (mapRef.map) {
+              setTimeout(() => {
+                mapRef.map.invalidateSize();
+                renderViewportMarkers();
+              }, 50);
+            }
+          });
+        }
+
         if (dom.btnBannerCleanup) {
           dom.btnBannerCleanup.addEventListener('click', cleanupCachePreservingModified);
         }
@@ -3299,20 +3391,20 @@
                 const active = b.dataset.filter === state.filterType;
                 if (b.dataset.filter === 'all') {
                   b.className = active
-                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap'
-                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-slate-600 text-slate-200 shrink-0 whitespace-nowrap';
+                    ? 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-sky-500 text-slate-950 shrink-0 whitespace-nowrap'
+                    : 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-slate-600 text-slate-200 shrink-0 whitespace-nowrap';
                 } else if (b.dataset.filter === 'underground') {
                   b.className = active
-                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-cyan-400 text-slate-950 inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
-                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
+                    ? 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-cyan-400 text-slate-950 inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
+                    : 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-cyan-500 text-cyan-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
                 } else if (b.dataset.filter === 'aboveground') {
                   b.className = active
-                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-500 text-white inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
-                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
+                    ? 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-rose-500 text-white inline-flex items-center gap-1 shrink-0 whitespace-nowrap'
+                    : 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-rose-500 text-rose-300 inline-flex items-center gap-1 shrink-0 whitespace-nowrap';
                 } else {
                   b.className = active
-                    ? 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 text-slate-950 shrink-0 whitespace-nowrap'
-                    : 'min-h-[36px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap';
+                    ? 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-black bg-amber-400 text-slate-950 shrink-0 whitespace-nowrap'
+                    : 'min-h-[34px] px-2.5 py-1 rounded-xl text-[11px] font-bold bg-[#1e293b] border border-amber-400 text-amber-300 shrink-0 whitespace-nowrap';
                 }
               });
               updateDetailAndHud();
@@ -3374,24 +3466,6 @@
             mapRef.activeLayer.addTo(mapRef.map);
             if (dom.layerName) dom.layerName.textContent = next.name;
             showToast(`地図: ${next.name}`, 'info');
-          });
-        }
-
-        if (dom.btnCenterUser) {
-          dom.btnCenterUser.addEventListener('click', () => {
-            if (!mapRef.map) return;
-            if (state.userPos.lat !== null && state.userPos.lon !== null) {
-              state.lastPannedLat = state.userPos.lat;
-              state.lastPannedLon = state.userPos.lon;
-              mapRef.map.setView([state.userPos.lat, state.userPos.lon], Math.max(mapRef.map.getZoom(), 17), {
-                animate: true
-              });
-            } else {
-              requestInitialGeolocation();
-              const s = getSelectedHydrant() || SAMPLE_SHIBATA_HYDRANTS[0];
-              mapRef.map.setView([s.lat, s.lon], 16, { animate: true });
-              showToast('現在地を取得中です', 'info');
-            }
           });
         }
 
